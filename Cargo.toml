@@ -1,0 +1,25 @@
+[package]
+name = "scig"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wgpu      = "30"
+bytemuck  = { version = "1", features = ["derive"] }
+log       = "0.4"
+thiserror = "2"
+winit     = { version = "0.30", optional = true }
+pollster  = { version = "1",    optional = true }
+image     = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
+tobj      = { version = "4",    optional = true }
+notify    = { version = "8",    optional = true }
+
+[features]
+default    = ["passes"]
+passes     = []                                   # points, lines, mesh, toy, post
+winit      = ["dep:winit", "dep:pollster"]        # app shell, input, cameras
+assets     = ["dep:image", "dep:tobj"]
+hot-reload = ["dep:notify"]
+
+[dev-dependencies]
+nalgebra = { version = "0.35", features = ["mint"] }
