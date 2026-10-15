@@ -4,7 +4,8 @@ use wgpu::util::DeviceExt;
 
 
 
-pub struct Buffer<T: bytemuck::Pod>
+#[derive(Debug)]
+pub struct Buffer<T>
 {
     handle: wgpu::Buffer,
     usage: wgpu::BufferUsages,

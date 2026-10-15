@@ -16,11 +16,12 @@ notify    = { version = "8",    optional = true }
 anyhow = "1.0.104"
 bitflags = "2.13.2"
 tokio = { version = "1.53", features = ["rt", "macros"] }
+parameterized = "2.1.0"
 
 [features]
-default    = ["passes"]
-passes     = []                                   # points, lines, mesh, toy, post
-winit      = ["dep:winit", "dep:pollster"]        # app shell, input, cameras
+default    = ["passes", "assets"]
+passes     = []
+winit      = ["dep:winit", "dep:pollster"]
 assets     = ["dep:image", "dep:tobj"]
 hot-reload = ["dep:notify"]
 
