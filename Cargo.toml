@@ -17,9 +17,10 @@ anyhow = "1.0.104"
 bitflags = "2.13.2"
 tokio = { version = "1.53", features = ["rt", "macros"] }
 parameterized = "2.1.0"
+nalgebra = "0.35"
 
 [features]
-default    = ["passes", "assets"]
+default    = ["passes", "assets", "winit"]
 passes     = []
 winit      = ["dep:winit", "dep:pollster"]
 assets     = ["dep:image", "dep:tobj"]

@@ -15,6 +15,45 @@ pub struct Buffer<T>
 
 
 
+impl<T> Buffer<T>
+{
+    pub fn handle(&self) -> &wgpu::Buffer
+    {
+        &self.handle
+    }
+
+
+
+    pub fn size_bytes(&self) -> u64
+    {
+        (self.len * size_of::<T>()) as _
+    }
+
+
+
+    #[expect(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize
+    {
+        self.len
+    }
+
+
+
+    pub fn cast<U: bytemuck::Pod>(self) -> Buffer<U>
+    {
+        debug_assert!(self.size_bytes().is_multiple_of(size_of::<U>() as _));
+        let len = (self.size_bytes() as usize) / size_of::<U>();
+        Buffer::<U> {
+            handle: self.handle,
+            usage: self.usage,
+            len,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+
+
 impl<T: bytemuck::Pod> Buffer<T>
 {
     pub fn new(context: &Context, usage: wgpu::BufferUsages, len: usize) -> Self
@@ -66,46 +105,11 @@ impl<T: bytemuck::Pod> Buffer<T>
             bytemuck::cast_slice(data),
         );
     }
-
-
-
-    pub fn handle(&self) -> &wgpu::Buffer
-    {
-        &self.handle
-    }
-
-
-
-    pub fn size_bytes(&self) -> u64
-    {
-        (self.len * size_of::<T>()) as _
-    }
-
-
-
-    #[expect(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize
-    {
-        self.len
-    }
-
-
-
-    pub fn cast<U: bytemuck::Pod>(self) -> Buffer<U>
-    {
-        debug_assert!(self.size_bytes().is_multiple_of(size_of::<U>() as _));
-        let len = (self.size_bytes() as usize) / size_of::<U>();
-        Buffer::<U> {
-            handle: self.handle,
-            usage: self.usage,
-            len,
-            _phantom: PhantomData,
-        }
-    }
 }
 
 
 
+#[expect(unused)]
 pub struct GrowBuffer<T: bytemuck::Pod>
 {
     buffer: Buffer<T>,
@@ -124,6 +128,7 @@ impl<T: bytemuck::Pod> GrowBuffer<T>
 
 
 
+#[expect(unused)]
 pub struct PingPong<T: bytemuck::Pod>
 {
     a: Buffer<T>,

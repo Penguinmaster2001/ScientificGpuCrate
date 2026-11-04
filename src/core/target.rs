@@ -2,14 +2,28 @@ use crate::core::{
     context::Context,
     texture::Texture,
 };
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    sync::Arc,
+};
+use wgpu::{
+    CurrentSurfaceTexture::{
+        self,
+        Success,
+    },
+    SurfaceTexture,
+};
+use winit::window::Window;
 
 
 
-#[expect(clippy::large_enum_variant)]
 pub enum Target
 {
-    Surface,
+    Surface
+    {
+        surface: wgpu::Surface<'static>,
+        config: wgpu::SurfaceConfiguration,
+    },
     Offscreen
     {
         color: Texture,
@@ -29,11 +43,42 @@ impl Target
     ) -> Self
     {
         let size = size.into();
-        Target::Offscreen {
+        Self::Offscreen {
             color: Texture::create_color_target(context, size, format),
             depth: Texture::create_depth_texture(context, size),
             format,
         }
+    }
+
+
+
+    pub fn window(context: &Context, window: Arc<Window>) -> anyhow::Result<Self>
+    {
+        let surface = context.instance.create_surface(window.clone())?;
+
+        let surface_caps = surface.get_capabilities(&context.adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_caps.formats[0]);
+
+        let size = window.inner_size();
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: surface_caps.present_modes[0],
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Auto,
+        };
+
+        Ok(Self::Surface { surface, config })
     }
 
 
@@ -48,7 +93,12 @@ impl Target
 
         match self
         {
-            Target::Surface => todo!(),
+            Target::Surface { surface, config } =>
+            {
+                config.width = size.0;
+                config.height = size.1;
+                surface.configure(&context.device, config);
+            }
             Target::Offscreen {
                 color,
                 depth,
@@ -67,11 +117,23 @@ impl Target
 
 
 
-    pub fn acquire(&mut self, _context: &Context) -> anyhow::Result<Frame, FrameError>
+    #[expect(unused_variables, unreachable_code)]
+    pub fn acquire(&mut self, context: &Context) -> anyhow::Result<Frame, FrameError>
     {
         match self
         {
-            Target::Surface => todo!(),
+            Target::Surface { surface, config } =>
+            {
+                let tex = get_surface_texture(surface)?;
+
+                Ok(Frame {
+                    color: todo!(),
+                    depth: todo!(),
+                    size: [config.width, config.height],
+                    format: config.format,
+                    present_handle: Some(tex),
+                })
+            }
             Target::Offscreen {
                 color,
                 depth,
@@ -91,7 +153,10 @@ impl Target
     {
         match self
         {
-            Target::Surface => None,
+            Target::Surface {
+                surface: _,
+                config: _,
+            } => None,
             Target::Offscreen {
                 color,
                 depth: _,
@@ -130,10 +195,28 @@ impl Frame
 #[derive(Debug)]
 pub enum FrameError
 {
-    Lost,
-    Outdated,
+    Suboptimal,
     Timeout,
-    OutOfMemory,
+    Occluded,
+    Outdated,
+    Lost,
+    Validation,
+}
+
+
+
+fn get_surface_texture(surface: &wgpu::Surface<'static>) -> Result<SurfaceTexture, FrameError>
+{
+    match surface.get_current_texture()
+    {
+        Success(surface_texture) => Ok(surface_texture),
+        CurrentSurfaceTexture::Suboptimal(_) => Err(FrameError::Suboptimal),
+        CurrentSurfaceTexture::Timeout => Err(FrameError::Timeout),
+        CurrentSurfaceTexture::Occluded => Err(FrameError::Occluded),
+        CurrentSurfaceTexture::Outdated => Err(FrameError::Outdated),
+        CurrentSurfaceTexture::Lost => Err(FrameError::Lost),
+        CurrentSurfaceTexture::Validation => Err(FrameError::Validation),
+    }
 }
 
 

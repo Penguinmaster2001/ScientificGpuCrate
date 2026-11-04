@@ -69,6 +69,7 @@ impl Context
     }
 
 
+
     pub async fn headless(b: ContextBuilder) -> anyhow::Result<Self>
     {
         let instance = Self::create_instance(&b);
