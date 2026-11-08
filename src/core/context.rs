@@ -1,13 +1,3 @@
-pub struct Context
-{
-    pub instance: wgpu::Instance,
-    pub adapter: wgpu::Adapter,
-    pub device: wgpu::Device,
-    pub queue: wgpu::Queue,
-}
-
-
-
 #[derive(Default)]
 pub struct ContextBuilder
 {
@@ -15,6 +5,27 @@ pub struct ContextBuilder
     pub features: wgpu::Features,
     pub limits: wgpu::Limits,
     pub power: wgpu::PowerPreference,
+}
+
+
+
+impl ContextBuilder
+{
+    pub fn features(mut self, features: wgpu::Features) -> Self
+    {
+        self.features = features;
+        self
+    }
+}
+
+
+
+pub struct Context
+{
+    pub instance: wgpu::Instance,
+    pub adapter: wgpu::Adapter,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
 }
 
 

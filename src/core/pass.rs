@@ -3,14 +3,18 @@ use crate::core::{
     pipeline::PipelineCache,
     shader::ShaderLib,
     target::Frame,
-    view::View,
+    view::{
+        View,
+        ViewBuffer,
+        ViewUniform,
+    },
 };
 
 
 
 pub trait Pass
 {
-    fn record(&mut self, cx: &mut FrameContext<'_>);
+    fn draw(&mut self, context: &mut FrameContext<'_>, view: usize);
 }
 
 
@@ -18,11 +22,12 @@ pub trait Pass
 pub struct FrameContext<'a>
 {
     pub context: &'a Context,
-    pub shaders: ShaderLib,
-    pub pipelines: PipelineCache,
+    pub shaders: &'a ShaderLib,
+    pub pipelines: &'a PipelineCache,
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub frame: &'a Frame,
     pub views: &'a [View],
+    pub view_buffer: &'a ViewBuffer,
     pub time: FrameTime,
 }
 
@@ -30,21 +35,22 @@ pub struct FrameContext<'a>
 
 impl<'a> FrameContext<'a>
 {
-    pub fn views_bind_group(&'a self) -> Option<wgpu::BindGroup>
+    pub fn views_bind_group(&'a self) -> &'a wgpu::BindGroup
     {
-        todo!()
+        self.view_buffer.bind_group()
     }
 
 
 
-    pub fn view_offset(&self, _i: usize) -> wgpu::DynamicOffset
+    pub fn view_offset(&self, i: u64) -> wgpu::DynamicOffset
     {
-        todo!()
+        (i * self.view_buffer.stride()) as _
     }
 }
 
 
 
+#[derive(Default)]
 pub struct FrameTime
 {
     pub t: f64,
@@ -113,46 +119,6 @@ impl PassOps
 
 
 
-// struct TrianglePass
-// {
-//     desc: RenderPipelineDesc,
-// }
-
-
-
-// impl Pass for TrianglePass
-// {
-//     fn record(&mut self, context: &mut FrameContext<'_>)
-//     {
-//         for (i, view) in context.views.iter().enumerate()
-//         {
-//             let desc = self.desc.clone().color_mask(view.color_mask);
-//             let pipeline = context
-//                 .pipelines
-//                 .render(context.context, &context.shaders, &desc)
-//                 .unwrap();
-//             let ops = if i == 0
-//             {
-//                 PassOps::clear(wgpu::Color::BLACK, 0.0)
-//             }
-//             else
-//             {
-//                 PassOps::load()
-//             };
-
-//             let views_bind_group = context.views_bind_group();
-//             let view_offset = context.view_offset(i);
-
-//             let mut pass = begin_render_pass(context.encoder, context.frame, ops);
-//             pass.set_pipeline(&pipeline);
-//             pass.set_bind_group(0, &views_bind_group, &[view_offset]);
-//             pass.draw(0..3, 0..1);
-//         }
-//     }
-// }
-
-
-
 pub fn begin_render_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     frame: &Frame,
@@ -176,4 +142,50 @@ pub fn begin_render_pass<'e>(
         timestamp_writes: None,
         multiview_mask: None,
     })
+}
+
+
+
+#[expect(clippy::too_many_arguments)]
+pub fn encode_frame(
+    context: &Context,
+    shaders: &mut ShaderLib,
+    pipelines: &mut PipelineCache,
+    view_buffer: &mut ViewBuffer,
+    encoder: &mut wgpu::CommandEncoder,
+    frame: &Frame,
+    views: &[View],
+    _clear: wgpu::Color,
+    passes: &mut [&mut (dyn Pass + 'static)],
+    frame_time: FrameTime,
+)
+{
+    view_buffer.upload(
+        context,
+        &views
+            .iter()
+            .map(|v| ViewUniform::new(v, frame.size))
+            .collect::<Vec<_>>(),
+    );
+
+    let mut frame_context = FrameContext {
+        context,
+        shaders,
+        pipelines,
+        encoder,
+        frame,
+        views,
+        view_buffer,
+        time: frame_time,
+    };
+
+
+
+    for pass in passes
+    {
+        for view in 0..views.len()
+        {
+            pass.draw(&mut frame_context, view);
+        }
+    }
 }

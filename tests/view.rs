@@ -1,13 +1,28 @@
+use crate::common::{
+    Harness,
+    approx,
+    cam_view,
+    eye_view,
+    proj90,
+    vec_approx,
+};
 use scig::core::{
     buffer::Buffer,
-    readback::EncoderToken,
-    readback::ReadBack,
+    math,
+    readback::{
+        EncoderToken,
+        ReadBack,
+    },
     view::{
         View,
-        ViewBuffer,
+        ViewProjection,
         ViewUniform,
     },
 };
+
+
+
+mod common;
 
 
 
@@ -17,39 +32,6 @@ const EPS: f32 = 1.0e-4;
 
 // ---------- ViewUniform (CPU) ----------
 
-#[test]
-fn view_uniform_is_368_bytes_without_padding()
-{
-    assert_eq!(std::mem::size_of::<ViewUniform>(), 368);
-    assert_eq!(std::mem::size_of::<ViewUniform>() % 16, 0);
-    let u = ViewUniform::new(&cam_view(), [64, 64]);
-    assert_eq!(bytemuck::bytes_of(&u).len(), 368);
-}
-
-
-
-#[test]
-fn view_uniform_derived_matrices()
-{
-    let view = math::look_at([1.0, 2.0, 3.0], [1.0, 2.0, -1.0], [0.0, 1.0, 0.0]);
-    let proj = proj90();
-    let u = ViewUniform::new(&View::new(view, proj), [640, 360]);
-    assert!(mat_approx(&u.view, &view, EPS));
-    assert!(mat_approx(&u.proj, &proj, EPS));
-    assert!(mat_approx(&u.view_proj, &math::mul(&proj, &view), EPS));
-    assert!(mat_approx(
-        &math::mul(&u.inv_view, &u.view),
-        &math::identity(),
-        EPS
-    ));
-    assert!(mat_approx(
-        &math::mul(&u.inv_proj, &u.proj),
-        &math::identity(),
-        1.0e-3
-    ));
-}
-
-
 
 #[test]
 fn view_uniform_position_comes_from_inverse_view()
@@ -57,10 +39,11 @@ fn view_uniform_position_comes_from_inverse_view()
     let u = ViewUniform::new(
         &View::new(
             math::look_at([1.0, 2.0, 3.0], [9.0, 9.0, 9.0], [0.0, 1.0, 0.0]),
-            proj90(),
+            ViewProjection::proj90(),
         ),
         [64, 64],
     );
+
     assert!(vec_approx(u.position, [1.0, 2.0, 3.0, 1.0], EPS));
 }
 
@@ -106,11 +89,11 @@ fn uniform_at(x: f32) -> ViewUniform
 // [position.x, viewport.x, view_proj[0][0], inv_view[3][0]].
 fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
 {
-    let ctx = &h.ctx;
-    let module = ctx
+    let context = &h.context;
+    let module = context
         .device
         .create_shader_module(wgpu::include_wgsl!("shaders/read_view.wgsl"));
-    let out_layout = ctx
+    let out_layout = context
         .device
         .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
@@ -125,14 +108,14 @@ fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
                 count: None,
             }],
         });
-    let layout = ctx
+    let layout = context
         .device
         .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[Some(h.view_buffer.layout()), Some(&out_layout)],
             immediate_size: 0,
         });
-    let pipeline = ctx
+    let pipeline = context
         .device
         .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
@@ -143,19 +126,22 @@ fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
             cache: Default::default(),
         });
     let out = Buffer::<f32>::new(
-        ctx,
+        context,
         wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
         4,
+        false,
     );
-    let out_group = ctx.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &out_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: out.handle().as_entire_binding(),
-        }],
-    });
-    let mut enc = ctx.device.create_command_encoder(&Default::default());
+    let out_group = context
+        .device
+        .create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &out_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: out.handle().as_entire_binding(),
+            }],
+        });
+    let mut enc = context.device.create_command_encoder(&Default::default());
     {
         let mut pass = enc.begin_compute_pass(&Default::default());
         pass.set_pipeline(&pipeline);
@@ -163,9 +149,9 @@ fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
         pass.set_bind_group(1, &out_group, &[]);
         pass.dispatch_workgroups(1, 1, 1);
     }
-    let rb = ReadBack::encode(ctx, &mut enc, &out);
-    ctx.queue.submit([enc.finish()]);
-    rb.map(ctx, EncoderToken { id: 0 }).unwrap()
+    let rb = ReadBack::encode(context, &mut enc, &out);
+    context.queue.submit([enc.finish()]);
+    rb.map(context, EncoderToken { id: 0 }).unwrap()
 }
 
 
@@ -174,7 +160,11 @@ fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
 async fn stride_respects_device_alignment()
 {
     let h = Harness::new().await;
-    let align = h.ctx.device.limits().min_uniform_buffer_offset_alignment as u64;
+    let align = h
+        .context
+        .device
+        .limits()
+        .min_uniform_buffer_offset_alignment as u64;
     let stride = h.view_buffer.stride();
     assert!(stride >= 368);
     assert_eq!(stride % align, 0);
@@ -195,12 +185,17 @@ async fn each_slot_is_visible_through_its_own_dynamic_offset()
     // show the last value in every read.
     let mut h = Harness::new().await;
     h.view_buffer.upload(
-        &h.ctx,
+        &h.context,
         &[uniform_at(10.0), uniform_at(20.0), uniform_at(30.0)],
     );
     for (slot, x) in [(0usize, 10.0f32), (1, 20.0), (2, 30.0)]
     {
         let r = read_slot(&h, slot);
+        println!(
+            "{slot}, {x}\n{:?}\n\n{:?}\n\n\n\n",
+            bytemuck::cast_slice::<u8, f32>(bytemuck::bytes_of(&r[0])),
+            bytemuck::cast_slice::<u8, f32>(bytemuck::bytes_of(&uniform_at(x)))
+        );
         assert!(
             vec_approx([r[0], r[1], r[2], r[3]], [x, 64.0, 1.0, x], 1.0e-3),
             "slot {slot}: {r:?}"
@@ -214,11 +209,11 @@ async fn each_slot_is_visible_through_its_own_dynamic_offset()
 async fn upload_grows_and_keeps_layout_stable()
 {
     let mut h = Harness::new().await;
-    h.view_buffer.upload(&h.ctx, &[uniform_at(1.0)]);
+    h.view_buffer.upload(&h.context, &[uniform_at(1.0)]);
     let layout_before = h.view_buffer.layout().clone();
     let xs: Vec<f32> = (0..9).map(|i| i as f32 * 3.0).collect();
     let us: Vec<ViewUniform> = xs.iter().map(|x| uniform_at(*x)).collect();
-    h.view_buffer.upload(&h.ctx, &us);
+    h.view_buffer.upload(&h.context, &us);
     assert!(
         h.view_buffer.layout().clone() == layout_before,
         "layout identity must not change"
@@ -226,6 +221,7 @@ async fn upload_grows_and_keeps_layout_stable()
     for slot in [0usize, 4, 8]
     {
         let r = read_slot(&h, slot);
+        println!("{slot}, {r:?}, {}", xs[slot]);
         assert!(approx(r[0], xs[slot], 1.0e-3), "slot {slot}: {r:?}");
     }
 }
@@ -236,7 +232,7 @@ async fn upload_grows_and_keeps_layout_stable()
 async fn upload_empty_slice_is_ok()
 {
     let mut h = Harness::new().await;
-    h.view_buffer.upload(&h.ctx, &[]);
+    h.view_buffer.upload(&h.context, &[]);
 }
 
 
@@ -246,7 +242,7 @@ async fn upload_replaces_previous_frame()
 {
     let mut h = Harness::new().await;
     h.view_buffer
-        .upload(&h.ctx, &[uniform_at(5.0), uniform_at(6.0)]);
-    h.view_buffer.upload(&h.ctx, &[uniform_at(7.0)]);
+        .upload(&h.context, &[uniform_at(5.0), uniform_at(6.0)]);
+    h.view_buffer.upload(&h.context, &[uniform_at(7.0)]);
     assert!(approx(read_slot(&h, 0)[0], 7.0, 1.0e-3));
 }

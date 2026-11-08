@@ -1,6 +1,29 @@
-use crate::core::context::Context;
+use crate::core::{
+    context::Context,
+    uniform::Uniform,
+};
 use std::marker::PhantomData;
 use wgpu::util::DeviceExt;
+
+
+
+fn cast_slice_with_padding<T: bytemuck::Pod + bytemuck::NoUninit>(
+    data: &[T],
+    stride: u64,
+) -> Vec<u8>
+{
+    let mut padded = vec![0; data.len() * stride as usize];
+    let data_size = size_of::<T>();
+
+    for (i, d) in data.iter().enumerate()
+    {
+        let dst = &mut padded[i * stride as usize..i * stride as usize + data_size];
+        let bytes = bytemuck::bytes_of(d);
+        dst.copy_from_slice(bytes);
+    }
+
+    padded
+}
 
 
 
@@ -9,7 +32,8 @@ pub struct Buffer<T>
 {
     handle: wgpu::Buffer,
     usage: wgpu::BufferUsages,
-    len: usize,
+    count: u64,
+    stride: u64,
     _phantom: PhantomData<T>,
 }
 
@@ -26,15 +50,14 @@ impl<T> Buffer<T>
 
     pub fn size_bytes(&self) -> u64
     {
-        (self.len * size_of::<T>()) as _
+        self.count * self.stride
     }
 
 
 
-    #[expect(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize
+    pub fn count(&self) -> u64
     {
-        self.len
+        self.count
     }
 
 
@@ -42,25 +65,47 @@ impl<T> Buffer<T>
     pub fn cast<U: bytemuck::Pod>(self) -> Buffer<U>
     {
         debug_assert!(self.size_bytes().is_multiple_of(size_of::<U>() as _));
-        let len = (self.size_bytes() as usize) / size_of::<U>();
+        let len = self.size_bytes() / size_of::<U>() as u64;
         Buffer::<U> {
             handle: self.handle,
             usage: self.usage,
-            len,
+            count: len,
+            stride: self.stride,
             _phantom: PhantomData,
         }
+    }
+
+
+
+    pub fn stride(&self) -> u64
+    {
+        self.stride
     }
 }
 
 
 
-impl<T: bytemuck::Pod> Buffer<T>
+impl<T: bytemuck::Pod + Uniform> Buffer<T>
 {
-    pub fn new(context: &Context, usage: wgpu::BufferUsages, len: usize) -> Self
+    pub fn new(
+        context: &Context,
+        usage: wgpu::BufferUsages,
+        count: u64,
+        dynamic_offset: bool,
+    ) -> Self
     {
+        let stride = if dynamic_offset
+        {
+            T::padded_uniform_size(context)
+        }
+        else
+        {
+            size_of::<T>() as _
+        };
+
         let handle = context.device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
-            size: (size_of::<T>() * len) as _,
+            size: (stride * count) as _,
             usage,
             mapped_at_creation: false,
         });
@@ -68,16 +113,31 @@ impl<T: bytemuck::Pod> Buffer<T>
         Self {
             handle,
             usage,
-            len,
+            count,
+            stride,
             _phantom: PhantomData,
         }
     }
 
 
 
-    pub fn from_slice(context: &Context, usage: wgpu::BufferUsages, data: &[T]) -> Self
+    pub fn from_slice(
+        context: &Context,
+        usage: wgpu::BufferUsages,
+        data: &[T],
+        dynamic_offset: bool,
+    ) -> Self
     {
-        let contents = bytemuck::cast_slice(data);
+        let stride = if dynamic_offset
+        {
+            T::padded_uniform_size(context)
+        }
+        else
+        {
+            size_of::<T>() as _
+        };
+
+        let contents = &cast_slice_with_padding(data, stride);
         let handle = context
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -89,20 +149,21 @@ impl<T: bytemuck::Pod> Buffer<T>
         Self {
             handle,
             usage,
-            len: data.len(),
+            count: data.len() as _,
+            stride,
             _phantom: PhantomData,
         }
     }
 
 
 
-    pub fn write(&self, context: &Context, offset: usize, data: &[T])
+    pub fn write(&self, context: &Context, offset: u64, data: &[T])
     {
-        debug_assert!(offset + data.len() <= self.len);
+        debug_assert!(offset + data.len() as u64 <= self.count);
         context.queue.write_buffer(
             &self.handle,
-            (offset * size_of::<T>()) as _,
-            bytemuck::cast_slice(data),
+            offset * self.stride,
+            bytemuck::cast_slice(&cast_slice_with_padding(data, self.stride)),
         );
     }
 }

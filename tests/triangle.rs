@@ -36,6 +36,10 @@ async fn render(
 ) -> anyhow::Result<Vec<u8>>
 {
     let mut shaders = ShaderLib::new();
+    let mut target = Target::offscreen(context, (W, H), format);
+    let frame = target.acquire(context)?;
+    let mut encoder = context.device.create_command_encoder(&Default::default());
+
     let shader = shaders
         .load_shader_source(context, include_str!("shaders/triangle.wgsl"))
         .id();
@@ -47,9 +51,6 @@ async fn render(
     let mut cache = PipelineCache::new();
     let pipeline = cache.render(context, &shaders, &desc)?; // Arc<wgpu::RenderPipeline>
 
-    let mut target = Target::offscreen(context, (W, H), format);
-    let frame = target.acquire(context)?;
-    let mut encoder = context.device.create_command_encoder(&Default::default());
     {
         let mut pass = begin_render_pass(
             &mut encoder,

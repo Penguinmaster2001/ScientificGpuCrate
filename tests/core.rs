@@ -36,12 +36,14 @@ async fn compute_buffer_readback() -> anyhow::Result<()>
         &context,
         wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
         &input_data,
+        false,
     );
 
     let output_buffer = Buffer::<u32>::new(
         &context,
         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE,
-        input_buffer.len(),
+        input_buffer.count(),
+        false,
     );
 
     let bind_group = BindGroupBuilder::new()

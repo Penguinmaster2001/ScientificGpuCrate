@@ -7,26 +7,22 @@ use crate::core::{
 
 pub trait Uniform
 {
-    fn uniform_size() -> u64;
-
-
-
-    fn padded_uniform_size(context: &Context) -> u64;
-
-
-
-    fn create_buffer(context: &Context) -> Buffer<Self>
+    fn uniform_size() -> u64
     where
-        Self: std::marker::Sized;
+        Self: std::marker::Sized,
+    {
+        std::mem::size_of::<Self>() as wgpu::BufferAddress
+    }
 
 
 
-    fn create_bind_group(
-        context: &Context,
-        buffer: &Buffer<Self>,
-    ) -> (wgpu::BindGroup, wgpu::BindGroupLayout)
+    fn padded_uniform_size(context: &Context) -> u64
     where
-        Self: std::marker::Sized;
+        Self: std::marker::Sized,
+    {
+        let min_alignment: u64 = context.device.limits().min_uniform_buffer_offset_alignment as _;
+        (Self::uniform_size() + min_alignment - 1) & !(min_alignment - 1) // ceil to alignment
+    }
 }
 
 
@@ -42,42 +38,12 @@ pub struct MatrixUniform<T, const N: usize, const M: usize>
 
 impl<T, const N: usize, const M: usize> MatrixUniform<T, N, M>
 {
-    pub const fn uniform_size() -> wgpu::BufferAddress
-    {
-        std::mem::size_of::<Self>() as wgpu::BufferAddress
-    }
-
-
-
-    pub fn padded_uniform_size(context: &Context) -> u64
-    {
-        let min_alignment: u64 = context.device.limits().min_uniform_buffer_offset_alignment as _;
-        (Self::uniform_size() + min_alignment - 1) & !(min_alignment - 1) // ceil to alignment
-    }
-}
-
-
-
-impl<T: bytemuck::Pod, const N: usize, const M: usize> MatrixUniform<T, N, M>
-{
-    pub fn create_buffer(context: &Context) -> Buffer<Self>
-    {
-        let max_models_per_frame = 64;
-
-        let buffer_len = max_models_per_frame * Self::padded_uniform_size(context);
-        Buffer::new(
-            context,
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            buffer_len as _,
-        )
-    }
-
-
-
     pub fn create_bind_group(
         context: &Context,
         buffer: &Buffer<Self>,
     ) -> (wgpu::BindGroup, wgpu::BindGroupLayout)
+    where
+        Self: std::marker::Sized,
     {
         let size = wgpu::BufferSize::new(Self::padded_uniform_size(context));
 
@@ -115,3 +81,16 @@ impl<T: bytemuck::Pod, const N: usize, const M: usize> MatrixUniform<T, N, M>
         (bind_group, layout)
     }
 }
+
+
+
+impl<T, const N: usize, const M: usize> Uniform for MatrixUniform<T, N, M> {}
+
+
+
+impl Uniform for u8 {}
+impl Uniform for u16 {}
+impl Uniform for u32 {}
+impl Uniform for Vec<u32> {}
+impl Uniform for f32 {}
+impl<const N: usize> Uniform for [f32; N] {}

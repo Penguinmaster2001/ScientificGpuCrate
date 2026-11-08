@@ -1,6 +1,7 @@
 pub mod bind;
 pub mod buffer;
 pub mod context;
+pub mod math;
 pub mod pass;
 pub mod pipeline;
 pub mod readback;
@@ -28,7 +29,7 @@ impl std::fmt::Display for Error
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        write!(f, "{:?}", self)
+        std::write!(f, "{:?}", self)
     }
 }
 

@@ -2,6 +2,7 @@ use crate::core::{
     buffer::Buffer,
     context::Context,
     texture::Texture,
+    uniform::Uniform,
 };
 use wgpu::TexelCopyBufferLayout;
 
@@ -23,14 +24,15 @@ pub struct ReadBack<T>
 
 
 
-impl<T: bytemuck::Pod> ReadBack<T>
+impl<T: bytemuck::Pod + Uniform> ReadBack<T>
 {
     pub fn encode(context: &Context, encoder: &mut wgpu::CommandEncoder, data: &Buffer<T>) -> Self
     {
         let staging_buffer = Buffer::new(
             context,
             wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            data.len(),
+            data.count(),
+            false,
         );
 
         encoder.copy_buffer_to_buffer(
@@ -110,6 +112,7 @@ impl TextureReadBack
             context,
             wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             buffer_size as _,
+            false,
         );
 
         Self {
