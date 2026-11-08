@@ -14,7 +14,8 @@ use crate::core::{
 
 pub trait Pass
 {
-    fn draw(&mut self, context: &mut FrameContext<'_>, view: usize);
+    fn prepare(&mut self, _context: &mut FrameContext<'_>) {}
+    fn draw(&mut self, _context: &mut FrameContext<'_>, _view: usize) {}
 }
 
 
@@ -23,7 +24,7 @@ pub struct FrameContext<'a>
 {
     pub context: &'a Context,
     pub shaders: &'a ShaderLib,
-    pub pipelines: &'a PipelineCache,
+    pub pipelines: &'a mut PipelineCache,
     pub encoder: &'a mut wgpu::CommandEncoder,
     pub frame: &'a Frame,
     pub views: &'a [View],
@@ -155,8 +156,8 @@ pub fn encode_frame(
     encoder: &mut wgpu::CommandEncoder,
     frame: &Frame,
     views: &[View],
-    _clear: wgpu::Color,
-    passes: &mut [&mut (dyn Pass + 'static)],
+    clear: wgpu::Color,
+    passes: &mut [&mut dyn Pass],
     frame_time: FrameTime,
 )
 {
@@ -179,11 +180,23 @@ pub fn encode_frame(
         time: frame_time,
     };
 
-
-
-    for pass in passes
+    for pass in passes.iter_mut()
     {
-        for view in 0..views.len()
+        pass.prepare(&mut frame_context);
+    }
+
+    // Clear pass
+    {
+        begin_render_pass(
+            frame_context.encoder,
+            frame_context.frame,
+            PassOps::clear(clear, 0.0),
+        );
+    }
+
+    for view in 0..views.len()
+    {
+        for pass in passes.iter_mut()
         {
             pass.draw(&mut frame_context, view);
         }

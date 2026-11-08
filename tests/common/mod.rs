@@ -15,7 +15,11 @@ use scig::core::{
     },
     pass::{
         FrameContext,
+        FrameTime,
         Pass,
+        PassOps,
+        begin_render_pass,
+        encode_frame,
     },
     pipeline::{
         DepthDesc,
@@ -25,8 +29,10 @@ use scig::core::{
     readback::{
         EncoderToken,
         ReadBack,
+        TextureReadBack,
     },
     shader::ShaderLib,
+    target::Target,
     uniform::Uniform,
     view::{
         View,
@@ -45,7 +51,7 @@ pub const RGBA8: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 
 
-pub async fn ctx() -> Context
+pub async fn context() -> Context
 {
     Context::headless(ContextBuilder::default())
         .await
@@ -219,7 +225,7 @@ impl Harness
 {
     pub async fn new() -> Self
     {
-        let context = ctx().await;
+        let context = context().await;
         let view_buffer = ViewBuffer::new(&context);
         Self {
             context,
@@ -233,39 +239,37 @@ impl Harness
 
     pub fn render(
         &mut self,
-        _size: (u32, u32),
-        _format: wgpu::TextureFormat,
-        _clear: wgpu::Color,
-        _views: &[View],
-        _passes: &mut [&mut dyn Pass],
+        size: (u32, u32),
+        format: wgpu::TextureFormat,
+        clear: wgpu::Color,
+        views: &[View],
+        passes: &mut [&mut dyn Pass],
     ) -> Vec<u8>
     {
-        // let mut target = Target::offscreen(&self.context, size, format);
-        // let frame = target.acquire(&self.context).unwrap();
-        // let mut encoder = self
-        //     .context
-        //     .device
-        //     .create_command_encoder(&Default::default());
-        // encode_frame(
-        //     &self.context,
-        //     &mut self.shaders,
-        //     &mut self.pipelines,
-        //     &mut self.view_buffer,
-        //     &mut encoder,
-        //     &frame,
-        //     views,
-        //     clear,
-        //     passes,
-        //     FrameTime::default(),
-        // );
-        // let rb =
-        //     TextureReadBack::encode_texture(&self.context, &mut encoder, target.color().unwrap());
-        // self.context.queue.submit([encoder.finish()]);
-        // frame.present(&self.context);
-        // rb.map_texture(&self.context, EncoderToken { id: 0 })
-        //     .unwrap()
-
-        Vec::new()
+        let mut target = Target::offscreen(&self.context, size, format);
+        let frame = target.acquire(&self.context).unwrap();
+        let mut encoder = self
+            .context
+            .device
+            .create_command_encoder(&Default::default());
+        encode_frame(
+            &self.context,
+            &mut self.shaders,
+            &mut self.pipelines,
+            &mut self.view_buffer,
+            &mut encoder,
+            &frame,
+            views,
+            clear,
+            passes,
+            FrameTime::default(),
+        );
+        let rb =
+            TextureReadBack::encode_texture(&self.context, &mut encoder, target.color().unwrap());
+        self.context.queue.submit([encoder.finish()]);
+        frame.present(&self.context);
+        rb.map_texture(&self.context, EncoderToken { id: 0 })
+            .unwrap()
     }
 
 
@@ -322,23 +326,25 @@ impl TrianglePass
 
 impl Pass for TrianglePass
 {
-    fn draw(&mut self, _context: &mut FrameContext<'_>, _view: usize)
+    fn draw(&mut self, context: &mut FrameContext<'_>, view: usize)
     {
-        // let desc = self.desc.clone().color_mask(context.views[view].color_mask);
-        // let pipeline = context
-        //     .pipelines
-        //     .render(context.context, &context.shaders, &desc)
-        //     .unwrap();
-        // let mut pass = begin_render_pass(context.encoder, context.frame, PassOps::load());
-        // pass.set_pipeline(&pipeline);
-        // if self.uses_view
-        // {
-        //     pass.set_bind_group(
-        //         0,
-        //         context.view_buffer.bind_group(),
-        //         &[context.view_buffer.offset(view)],
-        //     );
-        // }
-        // pass.draw(0..3, 0..self.instances);
+        let desc = self.desc.clone().color_mask(context.views[view].color_mask);
+        let pipeline = context
+            .pipelines
+            .render(context.context, context.shaders, &desc)
+            .unwrap();
+
+        let mut pass = begin_render_pass(context.encoder, context.frame, PassOps::load());
+        pass.set_pipeline(&pipeline);
+
+        if self.uses_view
+        {
+            pass.set_bind_group(
+                0,
+                context.view_buffer.bind_group(),
+                &[context.view_buffer.offset(view)],
+            );
+        }
+        pass.draw(0..3, 0..self.instances);
     }
 }
