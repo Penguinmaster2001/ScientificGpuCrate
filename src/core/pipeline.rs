@@ -1,3 +1,5 @@
+use pollster::FutureExt;
+
 use crate::core::{
     Error,
     bind::VertexLayoutDesc,
@@ -34,8 +36,19 @@ impl DepthDesc
     {
         Self {
             format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
             depth_compare: wgpu::CompareFunction::Greater,
+            depth_write_enabled: true,
+        }
+    }
+
+
+
+    pub fn always() -> Self
+    {
+        Self {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_compare: wgpu::CompareFunction::Always,
+            depth_write_enabled: true,
         }
     }
 }
@@ -167,7 +180,7 @@ impl ComputePipelineDesc
                 module: shader_lib
                     .get_shader(self.shader)
                     .ok_or(Error::NotFound)?
-                    .get_module(),
+                    .module(),
                 entry_point: None,
                 compilation_options: Default::default(),
                 cache: Default::default(),
@@ -217,69 +230,85 @@ impl PipelineCache
 
         let shader = shaders.get_shader(desc.shader).ok_or(Error::NotFound)?;
 
-        let pipeline = Arc::new(
-            context
-                .device
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: None,
-                    layout: Some(
-                        &context
-                            .device
-                            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                                label: None,
-                                bind_group_layouts: desc
-                                    .layouts
-                                    .iter()
-                                    .map(Some)
-                                    .collect::<Vec<Option<&wgpu::BindGroupLayout>>>()
-                                    .as_slice(),
-                                immediate_size: 0,
-                            }),
-                    ),
+        let fragment = if !desc.targets.is_empty()
+        {
+            Some(wgpu::FragmentState {
+                module: shader.module(),
+                entry_point: desc.fs,
+                targets: &desc.targets.iter().cloned().map(Some).collect::<Vec<_>>(),
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
+            })
+        }
+        else
+        {
+            None
+        };
 
-                    vertex: wgpu::VertexState {
-                        module: shader.get_module(),
-                        entry_point: Some(desc.vs),
-                        // buffers: &[Some(Vertex::desc())],
-                        buffers: &[],
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+        let error_scope = context
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+
+        let pipeline = Arc::new(context.device.create_render_pipeline(
+            &wgpu::RenderPipelineDescriptor {
+                label: None,
+                layout: Some(&context.device.create_pipeline_layout(
+                    &wgpu::PipelineLayoutDescriptor {
+                        label: None,
+                        bind_group_layouts: &desc.layouts.iter().map(Some).collect::<Vec<_>>(),
+                        immediate_size: 0,
                     },
+                )),
 
-                    fragment: Some(wgpu::FragmentState {
-                        module: shader.get_module(),
-                        entry_point: desc.fs,
-                        targets: &[Some(wgpu::ColorTargetState {
-                            format: desc.targets[0].format,
-                            blend: desc.targets[0].blend,
-                            write_mask: desc.targets[0].write_mask,
-                        })],
-                        compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    }),
+                vertex: wgpu::VertexState {
+                    module: shader.module(),
+                    entry_point: Some(desc.vs),
+                    // buffers: &[Some(Vertex::desc())],
+                    buffers: &[],
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                },
 
-                    primitive: wgpu::PrimitiveState {
-                        topology: desc.topology,
-                        strip_index_format: None,
-                        front_face: desc.front_face,
-                        cull_mode: desc.cull,
-                        ..Default::default()
-                    },
+                fragment,
 
-                    depth_stencil,
+                primitive: wgpu::PrimitiveState {
+                    topology: desc.topology,
+                    strip_index_format: None,
+                    front_face: desc.front_face,
+                    cull_mode: desc.cull,
+                    ..Default::default()
+                },
 
-                    multisample: wgpu::MultisampleState {
-                        count: desc.samples,
-                        mask: !0,
-                        alpha_to_coverage_enabled: false,
-                    },
+                depth_stencil,
 
-                    multiview_mask: None,
-                    cache: None,
-                }),
-        );
+                multisample: wgpu::MultisampleState {
+                    count: desc.samples,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+
+                multiview_mask: None,
+                cache: None,
+            },
+        ));
+
+        error_scope.pop().block_on().map_or(Ok(()), Err)?;
 
         self.cache.insert(desc.clone(), pipeline.clone());
 
         Ok(pipeline)
+    }
+
+
+
+    pub fn len(&self) -> usize
+    {
+        self.cache.len()
+    }
+
+
+
+    pub fn is_empty(&self) -> bool
+    {
+        self.cache.is_empty()
     }
 }
 

@@ -4,6 +4,7 @@ use std::{
         HashMap,
         hash_map::Entry,
     },
+    eprintln,
     hash::{
         DefaultHasher,
         Hash,
@@ -54,7 +55,7 @@ enum ShaderSource
 pub struct ShaderLib
 {
     includes: HashMap<String, ShaderSource>,
-    map: HashMap<ShaderId, ShaderSource>,
+    map: HashMap<ShaderId, Shader>,
 }
 
 
@@ -72,11 +73,19 @@ impl ShaderLib
 
     pub fn get_shader(&self, id: ShaderId) -> Option<&Shader>
     {
-        match self.map.get(&id)
-        {
-            Some(ShaderSource::Loaded(shader)) => Some(shader),
-            _ => None,
-        }
+        self.map.get(&id)
+    }
+
+
+
+    pub async fn try_load_shader_file(
+        &mut self,
+        context: &Context,
+        path: &Path,
+    ) -> anyhow::Result<&Shader>
+    {
+        self.try_load_shader_source(context, &std::fs::read_to_string(path)?)
+            .await
     }
 
 
@@ -88,38 +97,51 @@ impl ShaderLib
 
 
 
-    pub fn load_shader_source(&mut self, context: &Context, source: &str) -> &Shader
+    pub async fn try_load_shader_source(
+        &mut self,
+        context: &Context,
+        source: &str,
+    ) -> anyhow::Result<&Shader>
     {
         // TODO: shader includes
-        self.add_shader_module(Shader::from_source(context, source))
+        Ok(self.add_shader(Shader::try_from_source(context, source).await?))
     }
 
 
 
-    fn add_shader_module(&mut self, shader_module: wgpu::ShaderModule) -> &Shader
+    pub fn load_shader_source(&mut self, context: &Context, source: &str) -> &Shader
     {
-        let mut hasher = DefaultHasher::new();
-        shader_module.hash(&mut hasher);
-        let id = ShaderId::new(hasher.finish());
+        // TODO: shader includes
+        self.add_shader(Shader::from_source(context, source))
+    }
 
-        let shader = Shader { id, shader_module };
-        let shader_source = ShaderSource::Loaded(shader);
 
-        let source = match self.map.entry(id)
+
+    pub fn add_shader(&mut self, shader: Shader) -> &Shader
+    {
+        match self.map.entry(shader.id)
         {
-            Entry::Vacant(entry) => entry.insert(shader_source),
+            Entry::Vacant(entry) => entry.insert(shader),
             Entry::Occupied(mut entry) =>
             {
-                *entry.get_mut() = shader_source;
+                *entry.get_mut() = shader;
                 entry.into_mut()
             }
-        };
-
-        match source
-        {
-            ShaderSource::Loaded(shader) => shader,
-            _ => unreachable!("inserted a Loaded shader"),
         }
+    }
+
+
+
+    pub fn len(&self) -> usize
+    {
+        self.map.len()
+    }
+
+
+
+    pub fn is_empty(&self) -> bool
+    {
+        self.map.is_empty()
     }
 
 
@@ -163,21 +185,59 @@ pub struct Shader
 
 impl Shader
 {
-    pub fn get_module(&self) -> &wgpu::ShaderModule
+    pub fn from_source(context: &Context, source: &str) -> Self
     {
-        &self.shader_module
-    }
-
-
-
-    fn from_source(context: &Context, source: &str) -> wgpu::ShaderModule
-    {
-        context
+        let shader_module = context
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
                 source: wgpu::ShaderSource::Wgsl(source.into()),
-            })
+            });
+
+        let mut hasher = DefaultHasher::new();
+        source.hash(&mut hasher);
+        let id = ShaderId::new(hasher.finish());
+
+        Self { id, shader_module }
+    }
+
+
+
+    pub async fn try_from_source(context: &Context, source: &str) -> anyhow::Result<Self>
+    {
+        let error_scope = context
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+
+        let shader_module = context
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            });
+
+        for message in shader_module.get_compilation_info().await.messages
+        {
+            eprintln!(
+                "{:?} at {:?}: {}",
+                message.message_type, message.location, message.message
+            );
+        }
+        error_scope.pop().await.map_or(Ok(()), Err)?;
+
+
+        let mut hasher = DefaultHasher::new();
+        source.hash(&mut hasher);
+        let id = ShaderId::new(hasher.finish());
+
+        Ok(Self { id, shader_module })
+    }
+
+
+
+    pub fn module(&self) -> &wgpu::ShaderModule
+    {
+        &self.shader_module
     }
 
 
