@@ -10,7 +10,26 @@ use crate::core::{
 
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct VertexLayoutDesc;
+pub struct VertexLayoutDesc
+{
+    pub array_stride: u64,
+    pub step_mode: wgpu::VertexStepMode,
+    pub attributes: Vec<wgpu::VertexAttribute>,
+}
+
+
+
+impl VertexLayoutDesc
+{
+    pub fn to_vertex_layout(&'_ self) -> wgpu::VertexBufferLayout<'_>
+    {
+        wgpu::VertexBufferLayout {
+            array_stride: self.array_stride,
+            step_mode: self.step_mode,
+            attributes: &self.attributes,
+        }
+    }
+}
 
 
 

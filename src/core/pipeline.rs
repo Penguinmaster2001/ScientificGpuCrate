@@ -1,5 +1,3 @@
-use pollster::FutureExt;
-
 use crate::core::{
     Error,
     bind::VertexLayoutDesc,
@@ -9,6 +7,7 @@ use crate::core::{
         ShaderLib,
     },
 };
+use pollster::FutureExt;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -230,7 +229,7 @@ impl PipelineCache
 
         let shader = shaders.get_shader(desc.shader).ok_or(Error::NotFound)?;
 
-        let fragment = if !desc.targets.is_empty()
+        let fragment = if !desc.targets.is_empty() || desc.fs.is_some()
         {
             Some(wgpu::FragmentState {
                 module: shader.module(),
@@ -248,47 +247,52 @@ impl PipelineCache
             .device
             .push_error_scope(wgpu::ErrorFilter::Validation);
 
-        let pipeline = Arc::new(context.device.create_render_pipeline(
-            &wgpu::RenderPipelineDescriptor {
-                label: None,
-                layout: Some(&context.device.create_pipeline_layout(
-                    &wgpu::PipelineLayoutDescriptor {
-                        label: None,
-                        bind_group_layouts: &desc.layouts.iter().map(Some).collect::<Vec<_>>(),
-                        immediate_size: 0,
+        let pipeline = Arc::new(
+            context
+                .device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: None,
+                    layout: Some(&context.device.create_pipeline_layout(
+                        &wgpu::PipelineLayoutDescriptor {
+                            label: None,
+                            bind_group_layouts: &desc.layouts.iter().map(Some).collect::<Vec<_>>(),
+                            immediate_size: 0,
+                        },
+                    )),
+
+                    vertex: wgpu::VertexState {
+                        module: shader.module(),
+                        entry_point: Some(desc.vs),
+                        buffers: &desc
+                            .vertex
+                            .iter()
+                            .map(|v| Some(v.to_vertex_layout()))
+                            .collect::<Vec<_>>(),
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
                     },
-                )),
 
-                vertex: wgpu::VertexState {
-                    module: shader.module(),
-                    entry_point: Some(desc.vs),
-                    // buffers: &[Some(Vertex::desc())],
-                    buffers: &[],
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                },
+                    fragment,
 
-                fragment,
+                    primitive: wgpu::PrimitiveState {
+                        topology: desc.topology,
+                        strip_index_format: None,
+                        front_face: desc.front_face,
+                        cull_mode: desc.cull,
+                        ..Default::default()
+                    },
 
-                primitive: wgpu::PrimitiveState {
-                    topology: desc.topology,
-                    strip_index_format: None,
-                    front_face: desc.front_face,
-                    cull_mode: desc.cull,
-                    ..Default::default()
-                },
+                    depth_stencil,
 
-                depth_stencil,
+                    multisample: wgpu::MultisampleState {
+                        count: desc.samples,
+                        mask: !0,
+                        alpha_to_coverage_enabled: false,
+                    },
 
-                multisample: wgpu::MultisampleState {
-                    count: desc.samples,
-                    mask: !0,
-                    alpha_to_coverage_enabled: false,
-                },
-
-                multiview_mask: None,
-                cache: None,
-            },
-        ));
+                    multiview_mask: None,
+                    cache: None,
+                }),
+        );
 
         error_scope.pop().block_on().map_or(Ok(()), Err)?;
 

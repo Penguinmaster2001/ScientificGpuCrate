@@ -1,5 +1,6 @@
 use crate::core::context::Context;
 use image::GenericImageView;
+use std::assert_eq;
 
 
 
@@ -134,4 +135,32 @@ impl Texture
     {
         (self.texture.width(), self.texture.height())
     }
+}
+
+
+
+pub fn texture_data_to_image(
+    data: &[u8],
+    size: (u32, u32),
+) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>>
+{
+    assert_eq!(size.0 * size.1 * 4, data.len() as _);
+
+    let mut image = image::RgbaImage::new(size.0, size.1);
+    for y in 0..size.1
+    {
+        for x in 0..size.0
+        {
+            let offset = ((y * size.0 * 4) + (x * 4)) as usize;
+            let pixel = image::Rgba([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]);
+            image.put_pixel(x, y, pixel);
+        }
+    }
+
+    image
 }

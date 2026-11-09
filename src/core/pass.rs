@@ -185,7 +185,7 @@ pub fn encode_frame(
         pass.prepare(&mut frame_context);
     }
 
-    // Clear pass
+    // Color clear pass
     {
         begin_render_pass(
             frame_context.encoder,
@@ -196,6 +196,15 @@ pub fn encode_frame(
 
     for view in 0..views.len()
     {
+        // Clear pass
+        {
+            begin_render_pass(
+                frame_context.encoder,
+                frame_context.frame,
+                PassOps::load_color_clear_depth(0.0),
+            );
+        }
+
         for pass in passes.iter_mut()
         {
             pass.draw(&mut frame_context, view);
