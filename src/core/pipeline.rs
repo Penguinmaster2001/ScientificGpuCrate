@@ -50,6 +50,13 @@ impl DepthDesc
             depth_write_enabled: true,
         }
     }
+
+
+
+    pub fn format(&self) -> wgpu::TextureFormat
+    {
+        self.format
+    }
 }
 
 

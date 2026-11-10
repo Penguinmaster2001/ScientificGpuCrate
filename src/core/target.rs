@@ -29,6 +29,7 @@ pub enum Target
         color: Texture,
         depth: Texture,
         format: wgpu::TextureFormat,
+        generation: u64,
     },
 }
 
@@ -46,6 +47,7 @@ impl Target
         Self::Offscreen {
             color: Texture::create_color_target(context, size, format),
             depth: Texture::create_depth_texture(context, size),
+            generation: 0,
             format,
         }
     }
@@ -103,6 +105,7 @@ impl Target
                 color,
                 depth,
                 format,
+                generation,
             } =>
             {
                 if size == color.size()
@@ -111,6 +114,7 @@ impl Target
                 }
                 *color = Texture::create_color_target(context, size, *format);
                 *depth = Texture::create_depth_texture(context, size);
+                *generation += 1;
             }
         }
     }
@@ -138,6 +142,7 @@ impl Target
                 color,
                 depth,
                 format,
+                generation: _,
             } => Ok(Frame {
                 color: color.view.clone(),
                 depth: depth.view.clone(),
@@ -147,6 +152,7 @@ impl Target
             }),
         }
     }
+
 
 
     pub fn color(&self) -> Option<&Texture>
@@ -161,7 +167,46 @@ impl Target
                 color,
                 depth: _,
                 format: _,
+                generation: _,
             } => Some(color),
+        }
+    }
+
+
+
+    pub fn depth(&self) -> Option<&Texture>
+    {
+        match self
+        {
+            Target::Surface {
+                surface: _,
+                config: _,
+            } => None,
+            Target::Offscreen {
+                color: _,
+                depth,
+                format: _,
+                generation: _,
+            } => Some(depth),
+        }
+    }
+
+
+
+    pub fn generation(&self) -> u64
+    {
+        match self
+        {
+            Target::Surface {
+                surface: _,
+                config: _,
+            } => 0,
+            Target::Offscreen {
+                color: _,
+                depth: _,
+                format: _,
+                generation,
+            } => *generation,
         }
     }
 }
