@@ -1,5 +1,8 @@
 use crate::core::{
-    buffer::Buffer,
+    buffer::{
+        Buffer,
+        BufferAlignment,
+    },
     context::Context,
     math::{
         DEG_TO_RAD,
@@ -181,7 +184,7 @@ impl ViewBuffer
             context,
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             1,
-            true,
+            BufferAlignment::UniformAlignment,
         );
         let stride = buffer.stride();
 
@@ -232,7 +235,7 @@ impl ViewBuffer
             context,
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             count,
-            true,
+            BufferAlignment::UniformAlignment,
         );
 
         self.bind_group = context

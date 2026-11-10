@@ -81,7 +81,7 @@ pub fn near(a: [u8; 4], b: [u8; 4], tol: u8) -> bool
 
 pub fn pixels(d: &[u8], w: u32) -> impl Iterator<Item = (u32, u32, [u8; 4])> + '_
 {
-    d.chunks_exact(4).enumerate().map(move |(i, c)| {
+    d.as_chunks::<4>().0.iter().enumerate().map(move |(i, c)| {
         let i = i as u32;
         (i % w, i / w, [c[0], c[1], c[2], c[3]])
     })
@@ -197,12 +197,12 @@ pub fn dummy_view() -> View
 
 
 
-pub fn read_buffer<T: Pod + Uniform>(ctx: &Context, b: &Buffer<T>) -> Vec<T>
+pub fn read_buffer<T: Pod + Uniform>(context: &Context, b: &Buffer<T>) -> Vec<T>
 {
-    let mut enc = ctx.device.create_command_encoder(&Default::default());
-    let rb = ReadBack::encode(ctx, &mut enc, b);
-    ctx.queue.submit([enc.finish()]);
-    rb.map(ctx, EncoderToken { id: 0 }).unwrap()
+    let mut enc = context.device.create_command_encoder(&Default::default());
+    let rb = ReadBack::encode(context, &mut enc, b);
+    context.queue.submit([enc.finish()]);
+    rb.map(context, EncoderToken { id: 0 }).unwrap()
 }
 
 

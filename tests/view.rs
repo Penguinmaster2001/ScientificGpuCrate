@@ -7,7 +7,10 @@ use crate::common::{
     vec_approx,
 };
 use scig::core::{
-    buffer::Buffer,
+    buffer::{
+        Buffer,
+        BufferAlignment,
+    },
     math,
     readback::{
         EncoderToken,
@@ -129,7 +132,7 @@ fn read_slot(h: &Harness, slot: usize) -> Vec<f32>
         context,
         wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC,
         4,
-        false,
+        BufferAlignment::None,
     );
     let out_group = context
         .device

@@ -1,8 +1,10 @@
 use crate::core::{
-    buffer::Buffer,
+    buffer::{
+        Buffer,
+        BufferAlignment,
+    },
     context::Context,
     texture::Texture,
-    uniform::Uniform,
 };
 use wgpu::TexelCopyBufferLayout;
 
@@ -19,12 +21,13 @@ pub struct EncoderToken
 pub struct ReadBack<T>
 {
     staging_buffer: Buffer<T>,
+    count: u64,
     token: EncoderToken,
 }
 
 
 
-impl<T: bytemuck::Pod + Uniform> ReadBack<T>
+impl<T: bytemuck::Pod> ReadBack<T>
 {
     pub fn encode(context: &Context, encoder: &mut wgpu::CommandEncoder, data: &Buffer<T>) -> Self
     {
@@ -32,7 +35,7 @@ impl<T: bytemuck::Pod + Uniform> ReadBack<T>
             context,
             wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             data.count(),
-            false,
+            BufferAlignment::None,
         );
 
         encoder.copy_buffer_to_buffer(
@@ -45,6 +48,7 @@ impl<T: bytemuck::Pod + Uniform> ReadBack<T>
 
         Self {
             staging_buffer,
+            count: data.count(),
             token: EncoderToken { id: 0 },
         }
     }
@@ -69,7 +73,7 @@ impl<T: bytemuck::Pod + Uniform> ReadBack<T>
             rx.recv()??;
 
             bytemuck::try_cast_slice(&self.staging_buffer.handle().get_mapped_range(..)?)
-                .expect("Should be able to cast")
+                .expect("Should be able to cast")[0..self.count as usize]
                 .to_vec()
         };
 
@@ -112,7 +116,7 @@ impl TextureReadBack
             context,
             wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             buffer_size as _,
-            false,
+            BufferAlignment::CopyBufferAlignment,
         );
 
         Self {

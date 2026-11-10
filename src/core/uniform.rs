@@ -91,6 +91,16 @@ impl<T, const N: usize, const M: usize> Uniform for MatrixUniform<T, N, M> {}
 impl Uniform for u8 {}
 impl Uniform for u16 {}
 impl Uniform for u32 {}
-impl Uniform for Vec<u32> {}
+impl Uniform for u64 {}
+impl Uniform for u128 {}
+impl Uniform for usize {}
 impl Uniform for f32 {}
+impl Uniform for f64 {}
+impl<const N: usize> Uniform for [u8; N] {}
+impl<const N: usize> Uniform for [u16; N] {}
+impl<const N: usize> Uniform for [u32; N] {}
+impl<const N: usize> Uniform for [u64; N] {}
+impl<const N: usize> Uniform for [u128; N] {}
+impl<const N: usize> Uniform for [usize; N] {}
 impl<const N: usize> Uniform for [f32; N] {}
+impl<const N: usize> Uniform for [f64; N] {}

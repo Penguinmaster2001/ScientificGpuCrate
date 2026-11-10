@@ -1,7 +1,10 @@
 use parameterized::parameterized;
 use scig::core::{
     bind::BindGroupBuilder,
-    buffer::Buffer,
+    buffer::{
+        Buffer,
+        BufferAlignment,
+    },
     context::{
         Context,
         ContextBuilder,
@@ -36,14 +39,14 @@ async fn compute_buffer_readback() -> anyhow::Result<()>
         &context,
         wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::STORAGE,
         &input_data,
-        false,
+        BufferAlignment::None,
     );
 
     let output_buffer = Buffer::<u32>::new(
         &context,
         wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::STORAGE,
         input_buffer.count(),
-        false,
+        BufferAlignment::None,
     );
 
     let bind_group = BindGroupBuilder::new()
