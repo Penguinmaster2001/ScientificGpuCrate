@@ -211,6 +211,20 @@ pub struct GrowBuffer<T: bytemuck::Pod>
 
 
 
+impl<T: bytemuck::Pod> From<Buffer<T>> for GrowBuffer<T>
+{
+    fn from(buffer: Buffer<T>) -> Self
+    {
+        Self {
+            count: buffer.count(),
+            buffer,
+            generation: 0,
+        }
+    }
+}
+
+
+
 impl<T: bytemuck::Pod> GrowBuffer<T>
 {
     pub fn new<A: Into<BufferAlignment>>(
@@ -228,6 +242,17 @@ impl<T: bytemuck::Pod> GrowBuffer<T>
                 alignment,
             ),
             count: 0,
+            generation: 0,
+        }
+    }
+
+
+
+    pub fn from_buffer_with_count(buffer: Buffer<T>, count: u64) -> Self
+    {
+        Self {
+            buffer,
+            count,
             generation: 0,
         }
     }

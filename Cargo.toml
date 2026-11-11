@@ -28,4 +28,5 @@ assets     = ["dep:image", "dep:tobj"]
 hot-reload = ["dep:notify"]
 
 [dev-dependencies]
+function_name = "0.3.0"
 nalgebra = { version = "0.35", features = ["mint"] }

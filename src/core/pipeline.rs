@@ -53,6 +53,17 @@ impl DepthDesc
 
 
 
+    pub fn no_depth() -> Self
+    {
+        Self {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_compare: wgpu::CompareFunction::Never,
+            depth_write_enabled: false,
+        }
+    }
+
+
+
     pub fn format(&self) -> wgpu::TextureFormat
     {
         self.format
@@ -67,12 +78,12 @@ pub struct RenderPipelineDesc
     pub shader: ShaderId,
     pub vs: &'static str,
     pub fs: Option<&'static str>,
-    pub vertex: Vec<VertexLayoutDesc>, // owned form of VertexBufferLayout
+    pub vertex: Vec<Option<VertexLayoutDesc>>,
     pub topology: wgpu::PrimitiveTopology,
     pub cull: Option<wgpu::Face>,
     pub front_face: wgpu::FrontFace,
-    pub depth: Option<DepthDesc>,             // format, compare, write
-    pub targets: Vec<wgpu::ColorTargetState>, // format, blend, write mask
+    pub depth: Option<DepthDesc>,
+    pub targets: Vec<wgpu::ColorTargetState>,
     pub samples: u32,
     pub layouts: Vec<wgpu::BindGroupLayout>,
 }
@@ -138,6 +149,21 @@ impl RenderPipelineDesc
     pub fn layout(mut self, layout: wgpu::BindGroupLayout) -> Self
     {
         self.layouts.push(layout);
+
+        self
+    }
+
+
+
+    pub fn vertex(mut self, slot: usize, vertex: VertexLayoutDesc) -> Self
+    {
+        if self.vertex.len() >= slot
+        {
+            self.vertex
+                .append(&mut vec![None; slot - self.vertex.len()]);
+        }
+
+        self.vertex.push(Some(vertex));
 
         self
     }
@@ -273,7 +299,7 @@ impl PipelineCache
                         buffers: &desc
                             .vertex
                             .iter()
-                            .map(|v| Some(v.to_vertex_layout()))
+                            .map(|v| v.as_ref().map(|d| d.to_vertex_layout()))
                             .collect::<Vec<_>>(),
                         compilation_options: wgpu::PipelineCompilationOptions::default(),
                     },
