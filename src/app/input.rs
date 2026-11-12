@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use winit::{
     dpi::PhysicalPosition,
     event::{
@@ -145,7 +146,7 @@ struct MouseState
     pub pixel_scroll_delta: (f64, f64),
     pub line_scroll_delta: (f64, f64),
     pub movement_delta: (f64, f64),
-    pub buttons: Vec<(MouseButton, bool)>,
+    pub buttons: HashMap<MouseButton, KeyState>,
 }
 
 
@@ -169,22 +170,60 @@ impl MouseState
             self.line_scroll_delta.1 + self.pixel_scroll_delta.1,
         )
     }
+
+
+
+    fn button_state(&self, button: &MouseButton) -> &KeyState
+    {
+        self.buttons.get(button).unwrap_or(&KeyState {
+            pressed: false,
+            just_changed: false,
+        })
+    }
+
+
+
+    fn end_frame(&mut self)
+    {
+        self.pixel_scroll_delta = (0.0, 0.0);
+        self.line_scroll_delta = (0.0, 0.0);
+        self.movement_delta = (0.0, 0.0);
+        self.buttons
+            .iter_mut()
+            .for_each(|k| k.1.just_changed = false);
+    }
 }
 
 
 
 #[derive(Default)]
-struct FrameInput
+struct KeyState
 {
-    pub keyboard: Vec<(KeyCode, bool)>,
-    pub mouse: MouseState,
+    pressed: bool,
+    just_changed: bool,
 }
 
 
 
-impl FrameInput
+#[derive(Default)]
+pub struct InputState
 {
-    fn apply(&mut self, event: InputEvent)
+    mouse: MouseState,
+    keyboard: HashMap<KeyCode, KeyState>,
+}
+
+
+
+impl InputState
+{
+    pub fn new() -> Self
+    {
+        Default::default()
+    }
+
+
+
+    pub fn apply(&mut self, event: InputEvent)
     {
         match event
         {
@@ -206,28 +245,38 @@ impl FrameInput
                 self.mouse.movement_delta.0 += delta.0;
                 self.mouse.movement_delta.1 += delta.1;
             }
-            InputEvent::MouseButton { button, pressed } =>
+            InputEvent::MouseButton { button, pressed } => match self.mouse.buttons.entry(button)
             {
-                if let Some(b) = self.mouse.buttons.iter_mut().find(|b| b.0 == button)
+                std::collections::hash_map::Entry::Occupied(mut occupied_entry) =>
                 {
-                    b.1 = pressed;
+                    let entry = occupied_entry.get_mut();
+                    entry.just_changed = entry.pressed != pressed;
+                    entry.pressed = pressed;
                 }
-                else
+                std::collections::hash_map::Entry::Vacant(vacant_entry) =>
                 {
-                    self.mouse.buttons.push((button, pressed))
+                    vacant_entry.insert(KeyState {
+                        pressed,
+                        just_changed: true,
+                    });
                 }
-            }
-            InputEvent::Keyboard { code, pressed } =>
+            },
+            InputEvent::Keyboard { code, pressed } => match self.keyboard.entry(code)
             {
-                if let Some(k) = self.keyboard.iter_mut().find(|k| k.0 == code)
+                std::collections::hash_map::Entry::Occupied(mut occupied_entry) =>
                 {
-                    k.1 = pressed;
+                    let entry = occupied_entry.get_mut();
+                    entry.just_changed = entry.pressed != pressed;
+                    entry.pressed = pressed;
                 }
-                else
+                std::collections::hash_map::Entry::Vacant(vacant_entry) =>
                 {
-                    self.keyboard.push((code, pressed))
+                    vacant_entry.insert(KeyState {
+                        pressed,
+                        just_changed: true,
+                    });
                 }
-            }
+            },
         }
     }
 
@@ -241,211 +290,96 @@ impl FrameInput
 
 
 
-    fn key_value(&self, key: KeyCode) -> f64
+    pub fn key_value(&self, key: &KeyCode) -> f64
     {
         if self.key_down(key) { 1.0 } else { 0.0 }
     }
 
 
 
-    fn key_down(&self, key: KeyCode) -> bool
+    pub fn key_down(&self, key: &KeyCode) -> bool
     {
-        self.keyboard.iter().any(|e| e.1 && e.0 == key)
+        self.key_state(key).pressed
     }
 
 
 
-    fn button_down(&self, button: MouseButton) -> bool
+    pub fn key_just_pressed(&self, key: &KeyCode) -> bool
     {
-        self.mouse.buttons.iter().any(|b| b.1 && b.0 == button)
+        matches!(
+            self.key_state(key),
+            KeyState {
+                pressed: true,
+                just_changed: true
+            }
+        )
     }
 
 
 
-    fn mouse_delta(&self) -> (f64, f64)
+    pub fn key_just_released(&self, key: &KeyCode) -> bool
     {
-        self.mouse.movement_delta
+        matches!(
+            self.key_state(key),
+            KeyState {
+                pressed: false,
+                just_changed: true
+            }
+        )
     }
 
 
 
-    fn scroll(&self) -> f64
+    pub fn button_down(&self, button: &MouseButton) -> bool
     {
-        self.mouse.scroll().1
+        self.mouse.button_state(button).pressed
     }
 
 
 
-    fn axis(&self, pos: KeyCode, neg: KeyCode) -> f64
+    fn key_state(&self, key: &KeyCode) -> &KeyState
     {
-        self.key_value(pos) - self.key_value(neg)
-    }
-}
-
-
-
-pub struct InputState
-{
-    a_is_current: bool,
-    frame_a: FrameInput,
-    frame_b: FrameInput,
-}
-
-
-
-impl InputState
-{
-    pub fn new() -> Self
-    {
-        Self {
-            a_is_current: true,
-            frame_a: Default::default(),
-            frame_b: Default::default(),
-        }
-    }
-
-
-
-    pub fn apply(&mut self, event: InputEvent)
-    {
-        self.cur_frame_mut().apply(event)
-    }
-
-
-
-    pub fn is_down(&self, key: KeyCode) -> bool
-    {
-        self.cur_frame().key_down(key)
-    }
-
-
-
-    pub fn just_pressed(&self, key: KeyCode) -> bool
-    {
-        self.cur_frame().key_down(key) && !self.prev_frame().key_down(key)
-    }
-
-
-
-    pub fn just_released(&self, key: KeyCode) -> bool
-    {
-        !self.cur_frame().key_down(key) && self.prev_frame().key_down(key)
-    }
-
-
-
-    pub fn button_down(&self, button: MouseButton) -> bool
-    {
-        self.cur_frame().button_down(button)
+        self.keyboard.get(key).unwrap_or(&KeyState {
+            pressed: false,
+            just_changed: false,
+        })
     }
 
 
 
     pub fn mouse_delta(&self) -> (f64, f64)
     {
-        self.cur_frame().mouse_delta()
+        self.mouse.movement_delta
     }
 
 
 
     pub fn scroll(&self) -> f64
     {
-        self.cur_frame().scroll()
+        self.mouse.scroll().1
     }
 
 
 
-    pub fn axis(&self, pos: KeyCode, neg: KeyCode) -> f64
+    pub fn axis(&self, pos: &KeyCode, neg: &KeyCode) -> f64
     {
-        self.cur_frame().axis(pos, neg)
-    }
-
-
-
-    pub fn end_frame(&mut self)
-    {
-        self.swap();
-        self.clear_current();
+        self.key_value(pos) - self.key_value(neg)
     }
 
 
 
     pub fn focus_lost(&mut self)
     {
-        self.frame_a.clear();
-        self.frame_b.clear();
+        self.clear();
     }
 
 
 
-    fn swap(&mut self)
+    pub fn end_frame(&mut self)
     {
-        self.a_is_current = !self.a_is_current;
-    }
-
-
-
-    fn clear_current(&mut self)
-    {
-        if self.a_is_current
-        {
-            self.frame_a.clear();
-        }
-        else
-        {
-            self.frame_b.clear();
-        }
-    }
-
-
-
-    fn cur_frame(&self) -> &FrameInput
-    {
-        if self.a_is_current
-        {
-            &self.frame_a
-        }
-        else
-        {
-            &self.frame_b
-        }
-    }
-
-
-
-    fn cur_frame_mut(&mut self) -> &mut FrameInput
-    {
-        if self.a_is_current
-        {
-            &mut self.frame_a
-        }
-        else
-        {
-            &mut self.frame_b
-        }
-    }
-
-
-
-    fn prev_frame(&self) -> &FrameInput
-    {
-        if self.a_is_current
-        {
-            &self.frame_b
-        }
-        else
-        {
-            &self.frame_a
-        }
-    }
-}
-
-
-
-impl Default for InputState
-{
-    fn default() -> Self
-    {
-        Self::new()
+        self.keyboard
+            .iter_mut()
+            .for_each(|k| k.1.just_changed = false);
+        self.mouse.end_frame();
     }
 }

@@ -58,13 +58,13 @@ fn key_state_edges()
 {
     let mut s = InputState::new();
     s.apply(key(KeyCode::KeyW, true));
-    assert!(s.is_down(KeyCode::KeyW) && s.just_pressed(KeyCode::KeyW));
+    assert!(s.key_down(&KeyCode::KeyW) && s.key_just_pressed(&KeyCode::KeyW));
     s.end_frame();
-    assert!(s.is_down(KeyCode::KeyW) && !s.just_pressed(KeyCode::KeyW));
+    assert!(s.key_down(&KeyCode::KeyW) && !s.key_just_pressed(&KeyCode::KeyW));
     s.apply(key(KeyCode::KeyW, false));
-    assert!(!s.is_down(KeyCode::KeyW) && s.just_released(KeyCode::KeyW));
+    assert!(!s.key_down(&KeyCode::KeyW) && s.key_just_released(&KeyCode::KeyW));
     s.end_frame();
-    assert!(!s.just_released(KeyCode::KeyW));
+    assert!(!s.key_just_released(&KeyCode::KeyW));
 }
 
 
@@ -76,8 +76,8 @@ fn auto_repeat_does_not_retrigger_just_pressed()
     s.apply(key(KeyCode::Space, true));
     s.end_frame();
     s.apply(key(KeyCode::Space, true));
-    assert!(s.is_down(KeyCode::Space));
-    assert!(!s.just_pressed(KeyCode::Space));
+    assert!(s.key_down(&KeyCode::Space));
+    assert!(!s.key_just_pressed(&KeyCode::Space));
 }
 
 
@@ -87,10 +87,10 @@ fn press_and_release_inside_one_frame_is_still_seen()
 {
     let mut s = InputState::new();
     s.apply(key(KeyCode::KeyE, true));
-    assert!(s.just_pressed(KeyCode::KeyE));
+    assert!(s.key_just_pressed(&KeyCode::KeyE));
     s.apply(key(KeyCode::KeyE, false));
-    assert!(s.just_released(KeyCode::KeyE));
-    assert!(!s.is_down(KeyCode::KeyE));
+    assert!(s.key_just_released(&KeyCode::KeyE));
+    assert!(!s.key_down(&KeyCode::KeyE));
 }
 
 
@@ -133,7 +133,7 @@ fn mouse_buttons_track_state()
         button: MouseButton::Left,
         pressed: true,
     });
-    assert!(s.button_down(MouseButton::Left) && !s.button_down(MouseButton::Right));
+    assert!(s.button_down(&MouseButton::Left) && !s.button_down(&MouseButton::Right));
 }
 
 
@@ -142,13 +142,13 @@ fn mouse_buttons_track_state()
 fn axis_combines_two_keys()
 {
     let mut s = InputState::new();
-    assert_eq!(s.axis(KeyCode::KeyD, KeyCode::KeyA), 0.0);
+    assert_eq!(s.axis(&KeyCode::KeyD, &KeyCode::KeyA), 0.0);
     s.apply(key(KeyCode::KeyD, true));
-    assert_eq!(s.axis(KeyCode::KeyD, KeyCode::KeyA), 1.0);
+    assert_eq!(s.axis(&KeyCode::KeyD, &KeyCode::KeyA), 1.0);
     s.apply(key(KeyCode::KeyA, true));
-    assert_eq!(s.axis(KeyCode::KeyD, KeyCode::KeyA), 0.0);
+    assert_eq!(s.axis(&KeyCode::KeyD, &KeyCode::KeyA), 0.0);
     s.apply(key(KeyCode::KeyD, false));
-    assert_eq!(s.axis(KeyCode::KeyD, KeyCode::KeyA), -1.0);
+    assert_eq!(s.axis(&KeyCode::KeyD, &KeyCode::KeyA), -1.0);
 }
 
 
@@ -164,8 +164,8 @@ fn focus_loss_releases_everything()
         pressed: true,
     });
     s.focus_lost();
-    assert!(!s.is_down(KeyCode::KeyW));
-    assert!(!s.button_down(MouseButton::Left));
+    assert!(!s.key_down(&KeyCode::KeyW));
+    assert!(!s.button_down(&MouseButton::Left));
 }
 
 
