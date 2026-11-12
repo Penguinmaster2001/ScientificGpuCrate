@@ -957,12 +957,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mint"
-version = "0.5.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
-
-[[package]]
 name = "mio"
 version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1034,7 +1028,6 @@ dependencies = [
  "glam 0.32.1",
  "glam 0.33.12",
  "matrixmultiply",
- "mint",
  "nalgebra-macros",
  "num-complex",
  "num-rational",

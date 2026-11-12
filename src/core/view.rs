@@ -18,6 +18,7 @@ use glam::camera::rh::proj::directx as glam_proj;
 
 
 
+#[derive(Clone, Copy)]
 pub enum ViewProjection
 {
     Matrix(glam::Mat4),

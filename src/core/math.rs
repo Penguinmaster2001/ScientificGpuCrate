@@ -1,4 +1,4 @@
-use glam::camera::rh::view as glam_view;
+pub use glam::camera::rh::view as glam_view;
 
 
 
