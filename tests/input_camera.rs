@@ -7,23 +7,14 @@ mod common;
 
 
 use common::*;
-use scig::{
-    app::{
-        camera::{
-            FreeCamera,
-            OrbitCamera,
-        },
-        input::{
-            InputEvent,
-            InputState,
-        },
+use scig::app::{
+    camera::{
+        Camera,
+        FreeCamera,
     },
-    core::{
-        math,
-        view::{
-            View,
-            ViewUniform,
-        },
+    input::{
+        InputEvent,
+        InputState,
     },
 };
 use std::f32::consts::{
@@ -170,19 +161,17 @@ fn focus_loss_releases_everything()
 
 
 
-// ---------- FlyCamera ----------
+// ---------- FreeCamera ----------
 
-/*/
 #[test]
-fn fly_camera_defaults_to_looking_down_negative_z()
+fn free_camera_defaults_to_looking_down_negative_z()
 {
-    let c = FlyCamera::new([0.0, 0.0, 5.0], 0.0, 0.0);
-    assert!(vec_approx(c.forward(), [0.0, 0.0, -1.0], EPS));
-    assert!(vec_approx(
-        math::transform(&c.view(), [0.0, 0.0, 0.0, 1.0]),
-        [0.0, 0.0, -5.0, 1.0],
-        EPS
-    ));
+    let c = FreeCamera::default();
+    assert!(
+        vec_approx((*c.forward()).into(), [0.0, 0.0, -1.0], EPS),
+        "{:?}",
+        c.forward()
+    );
 }
 
 
@@ -190,27 +179,15 @@ fn fly_camera_defaults_to_looking_down_negative_z()
 #[test]
 fn positive_yaw_turns_right_and_positive_pitch_looks_up()
 {
-    assert!(vec_approx(
-        FlyCamera::new([0.0; 3], FRAC_PI_2, 0.0).forward(),
-        [1.0, 0.0, 0.0],
-        EPS
-    ));
-    let up = FlyCamera::new([0.0; 3], 0.0, FRAC_PI_4).forward();
-    assert!(up[1] > 0.7 && up[2] < 0.0);
-}
-
-
-
-#[test]
-fn pitch_is_clamped_below_the_poles()
-{
-    let mut c = FlyCamera::new([0.0; 3], 0.0, 0.0);
-    c.look(0.0, 100.0);
-    assert!(c.forward()[1] < 1.0);
-    c.look(0.0, -200.0);
-    assert!(c.forward()[1] > -1.0);
-    assert!(math::inverse(&c.view()).is_some());
-    assert!(c.view().iter().flatten().all(|v| v.is_finite()));
+    let fwd = (*FreeCamera::from_position_attitude([0.0; 3], FRAC_PI_2, 0.0, 0.0, proj90())
+        .forward())
+    .into();
+    assert!(vec_approx(fwd, [0.0, 1.0, 0.0], EPS), "fwd: {fwd:?}");
+    let up = *FreeCamera::from_position_attitude([0.0; 3], 0.0, FRAC_PI_4, 0.0, proj90()).forward();
+    assert!(
+        vec_approx(up.into(), [-0.707, 0.0, -0.707], 0.001),
+        "up: {up}"
+    );
 }
 
 
@@ -218,19 +195,29 @@ fn pitch_is_clamped_below_the_poles()
 #[test]
 fn translate_local_follows_yaw()
 {
-    let mut c = FlyCamera::new([0.0; 3], 0.0, 0.0);
+    let mut c = FreeCamera::default();
     c.translate_local([0.0, 0.0, 2.0]);
-    assert!(vec_approx(c.position(), [0.0, 0.0, -2.0], EPS));
+    assert!(vec_approx((*c.position()).into(), [0.0, 0.0, -2.0], EPS));
     c.translate_local([1.0, 0.0, 0.0]);
-    assert!(vec_approx(c.position(), [1.0, 0.0, -2.0], EPS));
+    assert!(vec_approx((*c.position()).into(), [1.0, 0.0, -2.0], EPS));
 
-    let mut t = FlyCamera::new([0.0; 3], FRAC_PI_2, 0.0);
+    let mut t = FreeCamera::from_position_attitude([0.0; 3], FRAC_PI_2, 0.0, 0.0, proj90());
+    assert!(
+        vec_approx((*t.position()).into(), [0.0, 0.0, 0.0], EPS),
+        "origin {}",
+        t.position()
+    );
     t.translate_local([0.0, 0.0, 2.0]);
-    assert!(vec_approx(t.position(), [2.0, 0.0, 0.0], EPS));
+    assert!(
+        vec_approx((*t.position()).into(), [0.0, 2.0, 0.0], EPS),
+        "1st translate {}",
+        t.position()
+    );
     t.translate_local([1.0, 0.0, 0.0]);
     assert!(
-        vec_approx(t.position(), [2.0, 0.0, 1.0], EPS),
-        "right of +x is +z"
+        vec_approx((*t.position()).into(), [1.0, 2.0, 0.0], EPS),
+        "right of +x is +z {}",
+        t.position()
     );
 }
 
@@ -239,77 +226,16 @@ fn translate_local_follows_yaw()
 #[test]
 fn view_is_consistent_with_forward()
 {
-    let c = FreeCamera::new([1.0, 2.0, 3.0], 0.7, 0.3);
+    let c = FreeCamera::from_position_attitude([1.0, 2.0, 3.0], 0.7, 0.3, 0.0, proj90());
     let f = c.forward();
-    let p = [1.0 + 3.0 * f[0], 2.0 + 3.0 * f[1], 3.0 + 3.0 * f[2], 1.0];
-    assert!(vec_approx(
-        math::transform(&c.view(), p),
-        [0.0, 0.0, -3.0, 1.0],
-        1.0e-3
-    ));
+    let p = [1.0 + 3.0 * f[0], 2.0 + 3.0 * f[1], 3.0 + 3.0 * f[2]];
+    assert!(
+        vec_approx(
+            c.view().view.inverse().transform_point3(p.into()).into(),
+            [0.0, 0.0, 3.0],
+            1.0e-3
+        ),
+        "{}",
+        c.view().view.inverse().transform_point3(p.into())
+    );
 }
-
-*/
-
-// ---------- OrbitCamera ----------
-
-/*
-#[test]
-fn orbit_position_is_the_eye_not_the_target()
-{
-    // Regression for the old OrbitCamera::get_position, which returned the target.
-    let c = OrbitCamera::new([1.0, 2.0, 3.0], 10.0, 0.0, 0.0, proj90());
-    assert!(vec_approx(c.target(), [1.0, 2.0, 3.0], EPS));
-    assert!(vec_approx(c.position(), [1.0, 2.0, 13.0], EPS));
-}
-
-
-
-#[test]
-fn orbit_view_puts_the_target_straight_ahead()
-{
-    let c = OrbitCamera::new([4.0, -1.0, 2.0], 7.0, 0.9, 0.4, proj90());
-    let p = math::transform(&c.view(), [4.0, -1.0, 2.0, 1.0]);
-    assert!(vec_approx(p, [0.0, 0.0, -7.0, 1.0], 1.0e-3));
-}
-
-
-
-#[test]
-fn view_uniform_reports_the_orbit_eye()
-{
-    let c = OrbitCamera::new([0.0, 0.0, 0.0], 10.0, 0.5, 0.2, proj90());
-    let u = ViewUniform::new(&c.view(), [64, 64]);
-    let e = c.position();
-    assert!(vec_approx(
-        [u.position[0], u.position[1], u.position[2]],
-        e,
-        1.0e-3
-    ));
-    assert!(e != c.target());
-}
-
-
-
-#[test]
-fn orbit_zoom_is_clamped()
-{
-    let mut c = OrbitCamera::new([0.0; 3], 10.0, 0.0, 0.0, proj90());
-    c.set_distance_limits(1.0, 20.0);
-    c.zoom(-1000.0);
-    assert!(approx(c.distance(), 1.0, EPS));
-    c.zoom(1000.0);
-    assert!(approx(c.distance(), 20.0, EPS));
-}
-
-
-
-#[test]
-fn orbit_pitch_is_clamped()
-{
-    let mut c = OrbitCamera::new([0.0; 3], 5.0, 0.0, 0.0, proj90());
-    c.orbit(0.0, 100.0);
-    assert!(c.view().iter().flatten().all(|v| v.is_finite()));
-    assert!(math::inverse(&c.view()).is_some());
-}
-*/

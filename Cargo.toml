@@ -17,7 +17,6 @@ anyhow = "1.0.104"
 bitflags = "2.13.2"
 tokio = { version = "1.53", features = ["rt", "macros"] }
 parameterized = "2.1.0"
-nalgebra = "0.35"
 glam = "0.34.2"
 
 [features]

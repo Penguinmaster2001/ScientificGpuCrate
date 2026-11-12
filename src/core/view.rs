@@ -34,6 +34,16 @@ pub enum ViewProjection
 
 
 
+impl Default for ViewProjection
+{
+    fn default() -> Self
+    {
+        Self::PerspectiveInfRev { fov_deg: 90.0 }
+    }
+}
+
+
+
 impl From<Mat4> for ViewProjection
 {
     fn from(value: Mat4) -> Self
