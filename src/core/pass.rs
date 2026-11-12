@@ -9,6 +9,7 @@ use crate::core::{
         ViewUniform,
     },
 };
+use std::time::Duration;
 
 
 
@@ -51,11 +52,11 @@ impl<'a> FrameContext<'a>
 
 
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct FrameTime
 {
-    pub t: f64,
-    pub dt: f32,
+    pub t: Duration,
+    pub dt: Duration,
     pub frame: u64,
 }
 

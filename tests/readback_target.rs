@@ -130,7 +130,7 @@ async fn resize_recreates_color_and_depth_together()
     t.resize(&context, (5, 3));
     assert_eq!(t.generation(), g0 + 1);
     assert_eq!(t.color().unwrap().size(), (5, 3));
-    assert_eq!(t.depth().unwrap().size(), (5, 3));
+    assert_eq!(t.depth().size(), (5, 3));
     let out = clear_and_read(&context, (5, 3), RGBA8, wgpu::Color::BLACK);
     assert_eq!(out.len(), 5 * 3 * 4);
 }
@@ -182,7 +182,7 @@ async fn depth_format_constant_matches_the_texture()
     let context = context().await;
     let t = Target::offscreen(&context, (4, 4), RGBA8);
     assert_eq!(Texture::DEPTH_FORMAT, wgpu::TextureFormat::Depth32Float);
-    assert_eq!(t.depth().unwrap().texture.format(), Texture::DEPTH_FORMAT);
+    assert_eq!(t.depth().texture.format(), Texture::DEPTH_FORMAT);
     assert_eq!(
         scig::core::pipeline::DepthDesc::reversed_z().format(),
         Texture::DEPTH_FORMAT

@@ -2,10 +2,7 @@ use crate::core::{
     context::Context,
     texture::Texture,
 };
-use std::{
-    fmt::Display,
-    sync::Arc,
-};
+use std::fmt::Display;
 use wgpu::{
     CurrentSurfaceTexture::{
         self,
@@ -13,7 +10,7 @@ use wgpu::{
     },
     SurfaceTexture,
 };
-use winit::window::Window;
+use winit::dpi::PhysicalSize;
 
 
 
@@ -21,8 +18,10 @@ pub enum Target
 {
     Surface
     {
+        depth: Texture,
         surface: wgpu::Surface<'static>,
         config: wgpu::SurfaceConfiguration,
+        generation: u64,
     },
     Offscreen
     {
@@ -54,10 +53,12 @@ impl Target
 
 
 
-    pub fn window(context: &Context, window: Arc<Window>) -> anyhow::Result<Self>
+    pub fn window(
+        context: &Context,
+        surface: wgpu::Surface<'static>,
+        size: PhysicalSize<u32>,
+    ) -> anyhow::Result<Self>
     {
-        let surface = context.instance.create_surface(window.clone())?;
-
         let surface_caps = surface.get_capabilities(&context.adapter);
         let surface_format = surface_caps
             .formats
@@ -65,8 +66,6 @@ impl Target
             .copied()
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
-
-        let size = window.inner_size();
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -80,7 +79,12 @@ impl Target
             color_space: wgpu::SurfaceColorSpace::Auto,
         };
 
-        Ok(Self::Surface { surface, config })
+        Ok(Self::Surface {
+            depth: Texture::create_depth_texture(context, size),
+            surface,
+            config,
+            generation: 0,
+        })
     }
 
 
@@ -95,11 +99,18 @@ impl Target
 
         match self
         {
-            Target::Surface { surface, config } =>
+            Target::Surface {
+                depth,
+                surface,
+                config,
+                generation,
+            } =>
             {
                 config.width = size.0;
                 config.height = size.1;
+                *depth = Texture::create_depth_texture(context, size);
                 surface.configure(&context.device, config);
+                *generation += 1;
             }
             Target::Offscreen {
                 color,
@@ -121,18 +132,23 @@ impl Target
 
 
 
-    #[expect(unused_variables, unreachable_code)]
+    #[expect(unused_variables)]
     pub fn acquire(&mut self, context: &Context) -> anyhow::Result<Frame, FrameError>
     {
         match self
         {
-            Target::Surface { surface, config } =>
+            Target::Surface {
+                depth,
+                surface,
+                config,
+                generation,
+            } =>
             {
                 let tex = get_surface_texture(surface)?;
 
                 Ok(Frame {
-                    color: todo!(),
-                    depth: todo!(),
+                    color: tex.texture.create_view(&Default::default()),
+                    depth: depth.view.clone(),
                     size: [config.width, config.height],
                     format: config.format,
                     present_handle: Some(tex),
@@ -160,8 +176,10 @@ impl Target
         match self
         {
             Target::Surface {
+                depth: _,
                 surface: _,
                 config: _,
+                generation: _,
             } => None,
             Target::Offscreen {
                 color,
@@ -174,20 +192,22 @@ impl Target
 
 
 
-    pub fn depth(&self) -> Option<&Texture>
+    pub fn depth(&self) -> &Texture
     {
         match self
         {
             Target::Surface {
+                depth,
                 surface: _,
                 config: _,
-            } => None,
+                generation: _,
+            } => depth,
             Target::Offscreen {
                 color: _,
                 depth,
                 format: _,
                 generation: _,
-            } => Some(depth),
+            } => depth,
         }
     }
 
@@ -198,9 +218,11 @@ impl Target
         match self
         {
             Target::Surface {
+                depth: _,
                 surface: _,
                 config: _,
-            } => 0,
+                generation,
+            } => *generation,
             Target::Offscreen {
                 color: _,
                 depth: _,
