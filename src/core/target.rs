@@ -60,16 +60,18 @@ impl Target
     ) -> anyhow::Result<Self>
     {
         let surface_caps = surface.get_capabilities(&context.adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
+
+        // TODO: choose surface format
+        // let surface_format = surface_caps
+        //     .formats
+        //     .iter()
+        //     .copied()
+        //     .find(|f| f.is_srgb())
+        //     .unwrap_or(surface_caps.formats[0]);
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
+            format: wgpu::TextureFormat::Rgba8Unorm, // surface_format,
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],

@@ -253,12 +253,8 @@ async fn color_mask_limits_written_channels()
 {
     let mut h = Harness::new().await;
     let desc = h.solid_desc("fs", RGBA8);
-    let mut tri = TrianglePass::new(desc);
-    let out = h.render_rgba8(
-        (4, 4),
-        &[cam_view().mask(wgpu::ColorWrites::RED)],
-        &mut [&mut tri],
-    );
+    let tri = TrianglePass::new(desc);
+    let out = h.render_rgba8((4, 4), &[cam_view().mask(wgpu::ColorWrites::RED)], &[&tri]);
     assert!(pixels(&out, 4).all(|(_, _, p)| p == RED));
 }
 
@@ -269,16 +265,16 @@ async fn cull_none_draws_back_faces()
 {
     let mut h = Harness::new().await;
     let mut desc = h.solid_desc("fs", RGBA8).front_face(wgpu::FrontFace::Cw);
-    let mut culled = TrianglePass::new(desc.clone());
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut [&mut culled]);
+    let culled = TrianglePass::new(desc.clone());
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[&culled]);
     assert!(
         pixels(&out, 4).all(|(_, _, p)| p == BLACK),
         "Cw + Back must cull"
     );
 
     desc.cull = None;
-    let mut visible = TrianglePass::new(desc);
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut [&mut visible]);
+    let visible = TrianglePass::new(desc);
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[&visible]);
     assert!(pixels(&out, 4).all(|(_, _, p)| p == WHITE));
 }
 
@@ -309,7 +305,7 @@ async fn additive_blend_accumulates_and_replace_does_not()
 
     let mut add = TrianglePass::new(mk(Some(additive())));
     add.instances = 2;
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut [&mut add]);
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[&add]);
     assert!(
         px(&out, 4, 1, 1)[0] >= 254,
         "0.5 + 0.5 should saturate: {:?}",
@@ -318,7 +314,7 @@ async fn additive_blend_accumulates_and_replace_does_not()
 
     let mut replace = TrianglePass::new(mk(None));
     replace.instances = 2;
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut [&mut replace]);
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[&replace]);
     assert!(px(&out, 4, 1, 1)[0].abs_diff(128) <= 1);
 }
 
@@ -337,7 +333,7 @@ async fn depth_greater_with_equal_depth_rejects_second_draw()
     };
     let mut strict = TrianglePass::new(mk(DepthDesc::reversed_z(), Some(additive())));
     strict.instances = 2;
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut [&mut strict]);
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[&strict]);
     assert!(
         px(&out, 4, 1, 1)[0].abs_diff(128) <= 1,
         "second draw must be rejected"

@@ -1,23 +1,57 @@
-use crate::core::{
-    pass::{
-        FrameTime,
-        Pass,
+use crate::{
+    app::{
+        input::InputEvent,
+        state::{
+            FrameState,
+            RenderInfoView,
+        },
     },
-    view::View,
+    core::{
+        pass::Pass,
+        view::View,
+    },
 };
+use std::time::Duration;
 
 
 
 #[derive(Default)]
-pub struct FrameData<'a>
+pub struct FrameData
 {
-    pub views: &'a [View],
-    pub passes: &'a mut [&'a mut dyn Pass],
+    pub views: Vec<View>,
+    pub passes: Vec<Box<dyn Pass + Send + Sync + 'static>>,
 }
 
 
 
-pub trait ScigEnv
+pub trait ScigEnv: 'static + Send + Sync
 {
-    fn get_frame(&mut self, frame_time: FrameTime) -> FrameData<'_>;
+    fn initialize(&mut self, _render_info: RenderInfoView<'_>) {}
+
+
+
+    fn start(&mut self) {}
+
+
+
+    fn stop(&mut self) {}
+
+
+
+    fn input(&mut self, _input: InputEvent) {}
+
+
+
+    fn step(&mut self, _delta: Duration) {}
+
+
+
+    fn frame(&mut self, _frame: FrameState) {}
+
+
+
+    fn get_frame(&mut self) -> FrameData
+    {
+        Default::default()
+    }
 }

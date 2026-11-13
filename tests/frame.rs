@@ -22,14 +22,14 @@ struct RecordingPass
 
 impl Pass for RecordingPass
 {
-    fn prepare(&mut self, _context: &mut FrameContext<'_>)
+    fn prepare(&self, _context: &mut FrameContext<'_>)
     {
         self.log.borrow_mut().push(format!("{}.prepare", self.name));
     }
 
 
 
-    fn draw(&mut self, _context: &mut FrameContext<'_>, view: usize)
+    fn draw(&self, _context: &mut FrameContext<'_>, view: usize)
     {
         self.log
             .borrow_mut()
@@ -59,8 +59,8 @@ fn recording_passes() -> (Rc<RefCell<Vec<String>>>, RecordingPass, RecordingPass
 async fn prepare_once_then_draws_are_view_major()
 {
     let mut h = Harness::new().await;
-    let (log, mut a, mut b) = recording_passes();
-    h.render_rgba8((4, 4), &[cam_view(), cam_view()], &mut [&mut a, &mut b]);
+    let (log, a, b) = recording_passes();
+    h.render_rgba8((4, 4), &[cam_view(), cam_view()], &[&a, &b]);
     // View-major: both passes finish view 0 before either starts view 1.
     // Pass-major would break depth/clear handling for multi-pass scenes.
     assert_eq!(
@@ -82,8 +82,8 @@ async fn prepare_once_then_draws_are_view_major()
 async fn prepare_runs_even_without_views_and_draw_does_not()
 {
     let mut h = Harness::new().await;
-    let (log, mut a, mut b) = recording_passes();
-    h.render_rgba8((4, 4), &[], &mut [&mut a, &mut b]);
+    let (log, a, b) = recording_passes();
+    h.render_rgba8((4, 4), &[], &[&a, &b]);
     assert_eq!(*log.borrow(), ["A.prepare", "B.prepare"]);
 }
 
@@ -103,7 +103,7 @@ async fn zero_views_still_clears_to_the_clear_color()
             a: 1.0,
         },
         &[],
-        &mut [],
+        &[],
     );
     assert_eq!(out.len(), 4 * 3 * 4);
     assert!(pixels(&out, 4).all(|(_, _, p)| p == [0, 255, 0, 255]));
@@ -115,7 +115,7 @@ async fn zero_views_still_clears_to_the_clear_color()
 async fn no_passes_one_view_is_just_the_clear()
 {
     let mut h = Harness::new().await;
-    let out = h.render_rgba8((4, 4), &[cam_view()], &mut []);
+    let out = h.render_rgba8((4, 4), &[cam_view()], &[]);
     assert!(pixels(&out, 4).all(|(_, _, p)| p == BLACK));
 }
 
@@ -125,10 +125,10 @@ async fn no_passes_one_view_is_just_the_clear()
 async fn driver_can_run_many_frames_with_one_harness()
 {
     let mut h = Harness::new().await;
-    let (log, mut a, _b) = recording_passes();
+    let (log, a, _b) = recording_passes();
     for _ in 0..5
     {
-        h.render_rgba8((4, 4), &[cam_view()], &mut [&mut a]);
+        h.render_rgba8((4, 4), &[cam_view()], &[&a]);
     }
     assert_eq!(log.borrow().len(), 10);
 }

@@ -15,8 +15,8 @@ use std::time::Duration;
 
 pub trait Pass
 {
-    fn prepare(&mut self, _context: &mut FrameContext<'_>) {}
-    fn draw(&mut self, _context: &mut FrameContext<'_>, _view: usize) {}
+    fn prepare(&self, _context: &mut FrameContext<'_>) {}
+    fn draw(&self, _context: &mut FrameContext<'_>, _view: usize) {}
 }
 
 
@@ -158,7 +158,7 @@ pub fn encode_frame(
     frame: &Frame,
     views: &[View],
     clear: wgpu::Color,
-    passes: &mut [&mut dyn Pass],
+    passes: &[&dyn Pass],
     frame_time: FrameTime,
 )
 {
@@ -181,7 +181,7 @@ pub fn encode_frame(
         time: frame_time,
     };
 
-    for pass in passes.iter_mut()
+    for pass in passes.iter()
     {
         pass.prepare(&mut frame_context);
     }
@@ -206,7 +206,7 @@ pub fn encode_frame(
             );
         }
 
-        for pass in passes.iter_mut()
+        for pass in passes.iter()
         {
             pass.draw(&mut frame_context, view);
         }

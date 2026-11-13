@@ -92,6 +92,7 @@ impl ViewProjection
 
 
 
+#[derive(Clone, Copy)]
 pub struct View
 {
     pub view: glam::Affine3,

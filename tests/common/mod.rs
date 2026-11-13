@@ -243,7 +243,7 @@ impl Harness
         format: wgpu::TextureFormat,
         clear: wgpu::Color,
         views: &[View],
-        passes: &mut [&mut dyn Pass],
+        passes: &[&dyn Pass],
     ) -> Vec<u8>
     {
         let mut target = Target::offscreen(&self.context, size, format);
@@ -278,7 +278,7 @@ impl Harness
         &mut self,
         size: (u32, u32),
         views: &[View],
-        passes: &mut [&mut dyn Pass],
+        passes: &[&dyn Pass],
     ) -> Vec<u8>
     {
         self.render(size, RGBA8, wgpu::Color::BLACK, views, passes)
@@ -301,6 +301,7 @@ impl Harness
 
 
 
+#[derive(Clone)]
 pub struct TrianglePass
 {
     pub desc: RenderPipelineDesc,
@@ -326,7 +327,7 @@ impl TrianglePass
 
 impl Pass for TrianglePass
 {
-    fn draw(&mut self, context: &mut FrameContext<'_>, view: usize)
+    fn draw(&self, context: &mut FrameContext<'_>, view: usize)
     {
         let desc = self.desc.clone().color_mask(context.views[view].color_mask);
         let pipeline = context

@@ -216,11 +216,11 @@ impl PointPass
 
 impl Pass for PointPass
 {
-    fn prepare(&mut self, _context: &mut FrameContext<'_>) {}
+    fn prepare(&self, _context: &mut FrameContext<'_>) {}
 
 
 
-    fn draw(&mut self, context: &mut FrameContext<'_>, view: usize)
+    fn draw(&self, context: &mut FrameContext<'_>, view: usize)
     {
         let desc = self
             .desc

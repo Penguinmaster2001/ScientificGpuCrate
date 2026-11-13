@@ -91,8 +91,8 @@ async fn every_pixel_lands_at_its_own_coordinates()
     let mut h = Harness::new().await;
     for (w, hgt) in [(5u32, 3u32), (33, 7), (64, 64), (255, 2)]
     {
-        let mut tri = TrianglePass::new(h.solid_desc("fs_coords", RGBA8));
-        let out = h.render_rgba8((w, hgt), &[cam_view()], &mut [&mut tri]);
+        let tri = TrianglePass::new(h.solid_desc("fs_coords", RGBA8));
+        let out = h.render_rgba8((w, hgt), &[cam_view()], &[&tri]);
         assert_eq!(out.len(), (w * hgt * 4) as usize);
         for (x, y, p) in pixels(&out, w)
         {

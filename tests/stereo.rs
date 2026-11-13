@@ -20,8 +20,8 @@ const R: wgpu::ColorWrites = wgpu::ColorWrites::RED;
 async fn single_view_writes_all_channels()
 {
     let mut h = Harness::new().await;
-    let mut tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
-    let out = h.render_rgba8((8, 8), &[cam_view()], &mut [&mut tri]);
+    let tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
+    let out = h.render_rgba8((8, 8), &[cam_view()], &[&tri]);
     assert!(pixels(&out, 8).all(|(_, _, p)| p == WHITE));
 }
 
@@ -34,9 +34,9 @@ async fn two_masked_views_compose_to_white()
     //   [0,255,255,255]  second view cleared color.
     //   [255,0,0,255]    second view kept depth: equal z fails the Greater test.
     let mut h = Harness::new().await;
-    let mut tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
+    let tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
     let views = [cam_view().mask(R), cam_view().mask(GB)];
-    let out = h.render_rgba8((8, 8), &views, &mut [&mut tri]);
+    let out = h.render_rgba8((8, 8), &views, &[&tri]);
     assert!(
         pixels(&out, 8).all(|(_, _, p)| p == WHITE),
         "{:?}",
@@ -50,9 +50,9 @@ async fn two_masked_views_compose_to_white()
 async fn view_order_does_not_matter()
 {
     let mut h = Harness::new().await;
-    let mut tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
+    let tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
     let views = [cam_view().mask(GB), cam_view().mask(R)];
-    let out = h.render_rgba8((8, 8), &views, &mut [&mut tri]);
+    let out = h.render_rgba8((8, 8), &views, &[&tri]);
     assert!(pixels(&out, 8).all(|(_, _, p)| p == WHITE));
 }
 
@@ -62,13 +62,13 @@ async fn view_order_does_not_matter()
 async fn three_views_one_channel_each()
 {
     let mut h = Harness::new().await;
-    let mut tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
+    let tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
     let views = [
         cam_view().mask(R),
         cam_view().mask(wgpu::ColorWrites::GREEN),
         cam_view().mask(wgpu::ColorWrites::BLUE),
     ];
-    let out = h.render_rgba8((8, 8), &views, &mut [&mut tri]);
+    let out = h.render_rgba8((8, 8), &views, &[&tri]);
     assert!(pixels(&out, 8).all(|(_, _, p)| p == WHITE));
 }
 
@@ -78,7 +78,7 @@ async fn three_views_one_channel_each()
 async fn masked_view_leaves_other_channels_at_clear_value()
 {
     let mut h = Harness::new().await;
-    let mut tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
+    let tri = TrianglePass::new(h.solid_desc("fs", RGBA8));
     let out = h.render(
         (8, 8),
         RGBA8,
@@ -89,7 +89,7 @@ async fn masked_view_leaves_other_channels_at_clear_value()
             a: 1.0,
         },
         &[cam_view().mask(R)],
-        &mut [&mut tri],
+        &[&tri],
     );
     assert!(pixels(&out, 8).all(|(_, _, p)| p == [255, 0, 255, 255]));
 }
@@ -119,7 +119,7 @@ async fn views_with_different_matrices_produce_horizontal_disparity()
         View::new(eye_view(0.5), proj90()).mask(GB),
     ];
     let w = 48;
-    let out = h.render_rgba8((w, w), &views, &mut [&mut tri]);
+    let out = h.render_rgba8((w, w), &views, &[&tri]);
 
     let red_only = |p: [u8; 4]| p == [255, 0, 0, 255];
     let green_only = |p: [u8; 4]| p == [0, 255, 255, 255];
@@ -160,7 +160,7 @@ async fn identical_views_have_zero_disparity()
         View::new(eye_view(0.0), proj90()).mask(GB),
     ];
     let w = 48;
-    let out = h.render_rgba8((w, w), &views, &mut [&mut tri]);
+    let out = h.render_rgba8((w, w), &views, &[&tri]);
 
     assert!(pixels(&out, w).all(|(_, _, p)| p == WHITE || p == BLACK));
     assert!(lit_count(&out, w) > 100);

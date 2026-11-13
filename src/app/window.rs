@@ -1,5 +1,19 @@
-use crate::app::state::State;
+use crate::app::env_thread::EnvRunner;
+use crate::app::state::{
+    RenderInfo,
+    RenderInfoView,
+    State,
+};
+use crate::core::context::{
+    Context,
+    ContextBuilder,
+};
 use crate::core::pass::FrameTime;
+use crate::core::pipeline::PipelineCache;
+use crate::core::shader::ShaderLib;
+use crate::core::target::Target;
+use crate::core::view::ViewBuffer;
+use pollster::FutureExt;
 use std::{
     sync::Arc,
     time::Instant,
@@ -17,9 +31,23 @@ use winit::{
 
 
 
+pub type EnvFactory = Box<dyn FnOnce(RenderInfoView) -> EnvRunner>;
+
+
+
+#[expect(clippy::large_enum_variant)]
+enum AppState
+{
+    PreInit(EnvFactory),
+    Running(State),
+    Error,
+}
+
+
+
 pub struct ScigApp
 {
-    state: Option<State>,
+    state: AppState,
     last_time: Instant,
     start_time: Instant,
     frame: u64,
@@ -29,10 +57,10 @@ pub struct ScigApp
 
 impl ScigApp
 {
-    pub fn new() -> Self
+    pub fn new(factory: EnvFactory) -> Self
     {
         Self {
-            state: None,
+            state: AppState::PreInit(factory),
             last_time: Instant::now(),
             start_time: Instant::now(),
             frame: 0,
@@ -42,22 +70,11 @@ impl ScigApp
 
 
 
-impl Default for ScigApp
-{
-    fn default() -> Self
-    {
-        Self::new()
-    }
-}
-
-
-
 impl ApplicationHandler<State> for ScigApp
 {
     fn resumed(&mut self, event_loop: &ActiveEventLoop)
     {
-        #[allow(unused_mut)]
-        let mut window_attributes = Window::default_attributes();
+        let window_attributes = Window::default_attributes();
 
         let window = match event_loop.create_window(window_attributes)
         {
@@ -70,24 +87,38 @@ impl ApplicationHandler<State> for ScigApp
             }
         };
 
-        self.state = match pollster::block_on(State::new(window))
+        if let AppState::PreInit(factory) = std::mem::replace(&mut self.state, AppState::Error)
         {
-            Ok(state) => Some(state),
-            Err(error) =>
-            {
-                eprintln!("Failed to create state: {error}");
-                event_loop.exit();
-                return;
-            }
-        };
+            let (context, surface) =
+                Context::with_surface(ContextBuilder::default(), window.clone())
+                    .block_on()
+                    .unwrap();
+            let shaders = ShaderLib::new();
+            let pipelines = PipelineCache::new();
+            let clear = wgpu::Color::BLACK;
+            let view_buffer = ViewBuffer::new(&context);
+            let target = Target::window(&context, surface, window.inner_size()).unwrap();
+
+            let mut render_info = RenderInfo {
+                target,
+                context,
+                shaders,
+                pipelines,
+                view_buffer,
+                clear,
+            };
+
+            let env = factory(render_info.borrow());
+
+            self.state = AppState::Running(State::new(render_info, env));
+        }
     }
 
 
 
-    #[allow(unused_mut)]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State)
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: State)
     {
-        self.state = Some(event);
+        self.state = AppState::Running(event);
     }
 
 
@@ -122,8 +153,8 @@ impl ApplicationHandler<State> for ScigApp
     {
         let state = match &mut self.state
         {
-            Some(canvas) => canvas,
-            None => return,
+            AppState::Running(canvas) => canvas,
+            _ => return,
         };
 
         match event

@@ -92,7 +92,7 @@ fn config(blend: PointBlend, depth: bool) -> PointPassConfig
 
 fn draw(h: &mut Harness, pass: &mut PointPass) -> Vec<u8>
 {
-    h.render_rgba8((N, N), &[cam_view()], &mut [pass])
+    h.render_rgba8((N, N), &[cam_view()], &[pass])
 }
 
 
@@ -330,7 +330,7 @@ async fn view_color_mask_applies_to_points()
     let mut pass = PointPass::new(&h.context, &mut h.shaders, config(PointBlend::Opaque, true));
     pass.set_points(&h.context, &[pt(0.0, 0.0, -5.0, 2.0, [1.0; 4])]);
     let views = [cam_view().mask(wgpu::ColorWrites::GREEN)];
-    let out = h.render_rgba8((N, N), &views, &mut [&mut pass]);
+    let out = h.render_rgba8((N, N), &views, &[&pass]);
 
     assert_eq!(px(&out, N, 32, 32), GREEN);
 }
