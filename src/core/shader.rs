@@ -18,7 +18,7 @@ use std::{
 
 
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct ShaderId
 {
     id: u64,

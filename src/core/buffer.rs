@@ -76,7 +76,7 @@ fn cast_slice_with_padding<T: bytemuck::Pod + bytemuck::NoUninit>(
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Buffer<T>
 {
     handle: wgpu::Buffer,
@@ -202,6 +202,7 @@ impl<T: bytemuck::Pod> Buffer<T>
 
 
 
+#[derive(Debug, Clone)]
 pub struct GrowBuffer<T: bytemuck::Pod>
 {
     buffer: Buffer<T>,

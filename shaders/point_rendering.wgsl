@@ -59,7 +59,12 @@ fn vs(@builtin(vertex_index) i: u32, point: Point) -> PointOutput
 
     var out: PointOutput;
 
-    out.clip_position = view.view_proj * (point.pos + (point.data[0] * quad_pos[i]));
+    let view_right = view.inv_view[0];
+    let view_up = view.inv_view[1];
+
+    let pos = vec4<f32>((quad_pos[i].x * view_right + quad_pos[i].y * view_up).xyz, 1.0);
+
+    out.clip_position = view.view_proj * (point.pos + (point.data[0] * pos));
     out.uv = quad_uv[i];
     out.world_position = point.pos;
     out.data = point.data;
@@ -81,5 +86,5 @@ fn fs(in: PointOutput) -> @location(0) vec4<f32>
         return in.color;
     }
 
-    return vec4<f32>(0.0);
+    discard;
 }

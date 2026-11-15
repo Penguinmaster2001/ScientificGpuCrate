@@ -94,6 +94,11 @@ impl EnvRunner
 
     pub fn get_frame(&mut self, frame: FrameState) -> anyhow::Result<Ref<'_, FrameData>>
     {
+        if self.handle.finished()
+        {
+            anyhow::bail!("thread done")
+        }
+
         self.handle.sender.send(EnvMessage::Frame(frame))?;
 
         // TODO: handle missed frame behavior and time limit
@@ -131,9 +136,9 @@ impl EnvRunner
     fn frame_step_run<E: ScigEnv>(step_pre_frame: bool) -> RunFn<E>
     {
         Box::new(move |mut env, receiver, snapshot| {
-            loop
+            while let Ok(m) = receiver.recv()
             {
-                match receiver.recv().unwrap()
+                match m
                 {
                     EnvMessage::Frame(frame) =>
                     {
@@ -156,6 +161,8 @@ impl EnvRunner
                     _ => (),
                 }
             }
+
+            env.stop();
         })
     }
 
@@ -235,7 +242,7 @@ pub struct EnvHandle<M, S>
 {
     sender: mpsc::Sender<M>,
     snapshot: watch::Receiver<S>,
-    _handle: thread::JoinHandle<()>,
+    handle: thread::JoinHandle<()>,
 }
 
 
@@ -254,7 +261,14 @@ impl<M: 'static + Send, S: 'static + Send + Sync> EnvHandle<M, S>
         Self {
             sender,
             snapshot: snapshot_receiver,
-            _handle: handle,
+            handle,
         }
+    }
+
+
+
+    pub fn finished(&self) -> bool
+    {
+        self.handle.is_finished()
     }
 }

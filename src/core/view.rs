@@ -152,7 +152,7 @@ impl ViewUniform
         let view_inv = view.view.inverse();
         let proj = view
             .proj
-            .matrix(viewport.0 as f32 / height as f32, 0.5, 1000.0);
+            .matrix(viewport.0 as f32 / height as f32, 0.01, 1000.0);
 
         Self {
             view: view_mat4.to_cols_array_2d(),

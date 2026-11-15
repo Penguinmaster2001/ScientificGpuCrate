@@ -19,7 +19,7 @@ use std::{
 
 
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DepthDesc
 {
     format: wgpu::TextureFormat,
@@ -72,7 +72,7 @@ impl DepthDesc
 
 
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RenderPipelineDesc
 {
     pub shader: ShaderId,

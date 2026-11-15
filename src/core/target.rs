@@ -134,8 +134,7 @@ impl Target
 
 
 
-    #[expect(unused_variables)]
-    pub fn acquire(&mut self, context: &Context) -> anyhow::Result<Frame, FrameError>
+    pub fn acquire(&mut self, _context: &Context) -> anyhow::Result<Frame, FrameError>
     {
         match self
         {
@@ -143,7 +142,7 @@ impl Target
                 depth,
                 surface,
                 config,
-                generation,
+                generation: _,
             } =>
             {
                 let tex = get_surface_texture(surface)?;

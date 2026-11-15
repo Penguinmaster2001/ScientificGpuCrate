@@ -32,7 +32,7 @@ pub struct Point
 
 
 #[repr(C)]
-#[derive(bytemuck::Pod, bytemuck::Zeroable, Clone, Copy)]
+#[derive(bytemuck::Pod, bytemuck::Zeroable, Debug, Clone, Copy)]
 pub struct PointUniform
 {
     pub pos: [f32; 4],
@@ -128,10 +128,29 @@ impl PointPassConfig
             capacity: 0,
         }
     }
+
+
+
+    pub fn blend(mut self, blend: PointBlend) -> Self
+    {
+        self.blend = blend;
+
+        self
+    }
+
+
+
+    pub fn depth(mut self, depth: bool) -> Self
+    {
+        self.depth = depth;
+
+        self
+    }
 }
 
 
 
+#[derive(Debug, Clone)]
 pub struct PointPass
 {
     point_buffer: GrowBuffer<PointUniform>,

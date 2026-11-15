@@ -9,7 +9,7 @@ use crate::core::{
 
 
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct VertexLayoutDesc
 {
     pub array_stride: u64,

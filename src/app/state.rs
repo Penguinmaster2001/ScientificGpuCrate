@@ -54,7 +54,7 @@ impl RenderInfo
 
 
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct FrameState
 {
     pub time: FrameTime,
@@ -102,7 +102,11 @@ impl State
 
 
 
-    pub fn render(&mut self, frame_time: FrameTime) -> anyhow::Result<()>
+    pub fn render(
+        &mut self,
+        frame_time: FrameTime,
+        pre_present: Option<impl FnOnce()>,
+    ) -> anyhow::Result<()>
     {
         let frame_data = self.env.get_frame(FrameState::from_time(frame_time))?;
 
@@ -131,6 +135,12 @@ impl State
         );
 
         self.render_info.context.queue.submit([encoder.finish()]);
+
+        if let Some(pre_present) = pre_present
+        {
+            pre_present();
+        }
+
         frame.present(&self.render_info.context);
 
         Ok(())

@@ -14,10 +14,6 @@ use scig::{
             ScigEnv,
         },
         state::RenderInfoView,
-        window::{
-            EnvFactory,
-            ScigApp,
-        },
     },
     core::{
         pass::Pass,
@@ -28,18 +24,13 @@ use scig::{
         view::View,
     },
 };
-use winit::{
-    event_loop::EventLoop,
-    platform::wayland::EventLoopBuilderExtWayland,
-};
 
 
 
-struct DummyEnv;
-
-
-
-impl ScigEnv for DummyEnv {}
+fn main()
+{
+    show_window();
+}
 
 
 
@@ -77,7 +68,10 @@ impl ScigEnv for TriEnv
 
         let shader = render_info
             .shaders
-            .load_shader_source(render_info.context, include_str!("shaders/world_tri.wgsl"))
+            .load_shader_source(
+                render_info.context,
+                include_str!("../shaders/world_tri.wgsl"),
+            )
             .id();
 
         let mut pass = TrianglePass::new(
@@ -97,15 +91,7 @@ impl ScigEnv for TriEnv
         ];
     }
 
-    fn start(&mut self) {}
 
-    fn stop(&mut self) {}
-
-    fn input(&mut self, _input: scig::app::input::InputEvent) {}
-
-    fn step(&mut self, _delta: std::time::Duration) {}
-
-    fn frame(&mut self, _frame: scig::app::state::FrameState) {}
 
     fn get_frame(&mut self) -> FrameData
     {
@@ -124,33 +110,7 @@ impl ScigEnv for TriEnv
 
 
 
-fn run_env(factory: EnvFactory) -> anyhow::Result<()>
-{
-    let event_loop = EventLoop::with_user_event().with_any_thread(true).build()?;
-    let mut app = ScigApp::new(factory);
-    event_loop.run_app(&mut app)?;
-
-    Ok(())
-}
-
-
-
-#[test]
-#[ignore = "window_test"]
 fn show_window()
-{
-    run_env(Box::new(|render_info| {
-        *render_info.clear = wgpu::Color::BLUE;
-        EnvRunner::new(DummyEnv, RunMode::Free)
-    }))
-    .unwrap()
-}
-
-
-
-#[test]
-#[ignore = "window_test"]
-fn tri_window()
 {
     run_env(Box::new(|render_info| {
         let mut env = TriEnv::new();

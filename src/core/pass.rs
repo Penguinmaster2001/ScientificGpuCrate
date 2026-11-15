@@ -52,7 +52,7 @@ impl<'a> FrameContext<'a>
 
 
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct FrameTime
 {
     pub t: Duration,

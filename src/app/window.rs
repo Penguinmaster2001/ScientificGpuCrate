@@ -4,6 +4,7 @@ use crate::app::state::{
     RenderInfoView,
     State,
 };
+use crate::app::window;
 use crate::core::context::{
     Context,
     ContextBuilder,
@@ -19,6 +20,7 @@ use std::{
     time::Instant,
 };
 use winit::event::WindowEvent;
+use winit::window::Window;
 use winit::{
     application::ApplicationHandler,
     event::{
@@ -26,7 +28,6 @@ use winit::{
         DeviceId,
     },
     event_loop::ActiveEventLoop,
-    window::Window,
 };
 
 
@@ -51,6 +52,7 @@ pub struct ScigApp
     last_time: Instant,
     start_time: Instant,
     frame: u64,
+    window: Option<Arc<window::Window>>,
 }
 
 
@@ -64,6 +66,7 @@ impl ScigApp
             last_time: Instant::now(),
             start_time: Instant::now(),
             frame: 0,
+            window: None,
         }
     }
 }
@@ -86,6 +89,8 @@ impl ApplicationHandler<State> for ScigApp
                 return;
             }
         };
+
+        self.window = Some(window.clone());
 
         if let AppState::PreInit(factory) = std::mem::replace(&mut self.state, AppState::Error)
         {
@@ -144,6 +149,16 @@ impl ApplicationHandler<State> for ScigApp
 
 
 
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop)
+    {
+        if let Some(window) = self.window.clone()
+        {
+            window.request_redraw();
+        }
+    }
+
+
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -154,7 +169,11 @@ impl ApplicationHandler<State> for ScigApp
         let state = match &mut self.state
         {
             AppState::Running(canvas) => canvas,
-            _ => return,
+            _ =>
+            {
+                println!("incorrect state");
+                return;
+            }
         };
 
         match event
@@ -176,7 +195,15 @@ impl ApplicationHandler<State> for ScigApp
                 self.frame += 1;
                 self.last_time = now;
 
-                match state.render(frame_time)
+                match state.render(
+                    frame_time,
+                    Some(|| {
+                        if let Some(window) = self.window.clone()
+                        {
+                            window.pre_present_notify();
+                        }
+                    }),
+                )
                 {
                     Ok(_) => (),
 
@@ -188,14 +215,14 @@ impl ApplicationHandler<State> for ScigApp
                     // }
                     Err(e) =>
                     {
-                        eprintln!("Unable to render {}", e);
+                        println!("Unable to render {}", e);
                     }
                 }
             }
 
-            event =>
+            _event =>
             {
-                println!("{:?}", event);
+                // println!("{:?}", event);
                 // if let Ok(event) = InputEvent::try_from(event)
                 // {
                 //     state.handle_input(event_loop, event);
