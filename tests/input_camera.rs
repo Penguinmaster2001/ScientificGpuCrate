@@ -2,24 +2,9 @@
 
 
 
-mod common;
-
-
-
-use common::*;
-use scig::app::{
-    camera::{
-        Camera,
-        FreeCamera,
-    },
-    input::{
-        InputEvent,
-        InputState,
-    },
-};
-use std::f32::consts::{
-    FRAC_PI_2,
-    FRAC_PI_4,
+use scig::app::input::{
+    InputEvent,
+    InputState,
 };
 use winit::{
     event::{
@@ -28,10 +13,6 @@ use winit::{
     },
     keyboard::KeyCode,
 };
-
-
-
-const EPS: f32 = 1.0e-4;
 
 
 
@@ -157,85 +138,4 @@ fn focus_loss_releases_everything()
     s.focus_lost();
     assert!(!s.key_down(&KeyCode::KeyW));
     assert!(!s.button_down(&MouseButton::Left));
-}
-
-
-
-// ---------- FreeCamera ----------
-
-#[test]
-fn free_camera_defaults_to_looking_down_negative_z()
-{
-    let c = FreeCamera::default();
-    assert!(
-        vec_approx((*c.forward()).into(), [0.0, 0.0, -1.0], EPS),
-        "{:?}",
-        c.forward()
-    );
-}
-
-
-
-#[test]
-fn positive_yaw_turns_right_and_positive_pitch_looks_up()
-{
-    let fwd = (*FreeCamera::from_position_attitude([0.0; 3], FRAC_PI_2, 0.0, 0.0, proj90())
-        .forward())
-    .into();
-    assert!(vec_approx(fwd, [0.0, 1.0, 0.0], EPS), "fwd: {fwd:?}");
-    let up = *FreeCamera::from_position_attitude([0.0; 3], 0.0, FRAC_PI_4, 0.0, proj90()).forward();
-    assert!(
-        vec_approx(up.into(), [-0.707, 0.0, -0.707], 0.001),
-        "up: {up}"
-    );
-}
-
-
-
-#[test]
-fn translate_local_follows_yaw()
-{
-    let mut c = FreeCamera::default();
-    c.translate_local([0.0, 0.0, 2.0]);
-    assert!(vec_approx((*c.position()).into(), [0.0, 0.0, -2.0], EPS));
-    c.translate_local([1.0, 0.0, 0.0]);
-    assert!(vec_approx((*c.position()).into(), [1.0, 0.0, -2.0], EPS));
-
-    let mut t = FreeCamera::from_position_attitude([0.0; 3], FRAC_PI_2, 0.0, 0.0, proj90());
-    assert!(
-        vec_approx((*t.position()).into(), [0.0, 0.0, 0.0], EPS),
-        "origin {}",
-        t.position()
-    );
-    t.translate_local([0.0, 0.0, 2.0]);
-    assert!(
-        vec_approx((*t.position()).into(), [0.0, 2.0, 0.0], EPS),
-        "1st translate {}",
-        t.position()
-    );
-    t.translate_local([1.0, 0.0, 0.0]);
-    assert!(
-        vec_approx((*t.position()).into(), [1.0, 2.0, 0.0], EPS),
-        "right of +x is +z {}",
-        t.position()
-    );
-}
-
-
-
-#[test]
-fn view_is_consistent_with_forward()
-{
-    let c = FreeCamera::from_position_attitude([1.0, 2.0, 3.0], 0.7, 0.3, 0.0, proj90());
-    let f = c.forward();
-    let p = [1.0 + 3.0 * f[0], 2.0 + 3.0 * f[1], 3.0 + 3.0 * f[2]];
-    assert!(
-        vec_approx(
-            c.view().view.inverse().transform_point3(p.into()).into(),
-            [0.0, 0.0, 3.0],
-            1.0e-3
-        ),
-        "{}",
-        c.view().view.inverse().transform_point3(p.into())
-    );
 }

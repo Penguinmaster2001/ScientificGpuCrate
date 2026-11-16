@@ -196,23 +196,37 @@ impl FreeCamera
 
     pub fn translate_world<X: Into<glam::Vec3>>(&mut self, translation: X)
     {
-        self.transform.translation += translation.into();
+        self.transform.translation += self
+            .transform
+            .matrix3
+            .transpose_mul_vec3(translation.into());
     }
 
 
 
     pub fn translate_local<X: Into<glam::Vec3>>(&mut self, translation: X)
     {
-        self.transform.translation += self.transform.matrix3 * translation.into();
+        self.transform.translation += translation.into();
     }
 
 
 
     pub fn rotate_euler(&mut self, d_pitch: f32, d_yaw: f32, d_roll: f32)
     {
-        self.transform.matrix3 =
-            glam::Mat3::from_euler(glam::EulerRot::YXZEx, d_yaw, d_pitch, -d_roll)
-                * self.transform.matrix3;
+        self.transform.matrix3 *=
+            glam::Mat3::from_euler(glam::EulerRot::YXZEx, d_yaw, d_pitch, -d_roll);
+    }
+
+
+
+    pub fn rotate_local(&mut self, d_pitch: f32, d_yaw: f32, d_roll: f32)
+    {
+        self.transform = glam::Affine3::from_mat3(glam::Mat3::from_euler(
+            glam::EulerRot::YXZEx,
+            d_yaw,
+            d_pitch,
+            -d_roll,
+        )) * self.transform;
     }
 }
 

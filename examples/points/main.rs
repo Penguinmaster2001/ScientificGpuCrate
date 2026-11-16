@@ -1,5 +1,9 @@
 use scig::{
     app::{
+        camera::{
+            Camera,
+            FreeCamera,
+        },
         env_thread::{
             EnvRunner,
             RunMode,
@@ -29,14 +33,19 @@ use scig::{
     },
 };
 use std::f32;
-use winit::event_loop::EventLoop;
+use winit::{
+    event_loop::EventLoop,
+    keyboard::KeyCode,
+};
 
 
 
 struct PointEnv
 {
     pass: Option<PointPass>,
-    views: Vec<View>,
+    rotate_view: View,
+    camera: FreeCamera,
+    use_camera: bool,
 }
 
 
@@ -47,7 +56,12 @@ impl PointEnv
     {
         Self {
             pass: None,
-            views: vec![],
+            rotate_view: View::new(
+                glam::Affine3::from_translation([1.6, 0.0, 0.0].into()),
+                ViewProjection::PerspectiveInfRev { fov_deg: 90.0 },
+            ),
+            camera: FreeCamera::default(),
+            use_camera: false,
         }
     }
 }
@@ -96,26 +110,45 @@ impl ScigEnv for PointEnv
         );
 
         self.pass = Some(pass);
-
-        self.views = vec![View::new(
-            glam::Affine3::from_translation([1.6, 0.0, 0.0].into()),
-            ViewProjection::PerspectiveInfRev { fov_deg: 90.0 },
-        )];
     }
 
 
 
     fn frame(&mut self, frame: FrameState)
     {
-        let delta = 0.05 * f32::consts::TAU * frame.time.dt.as_secs_f32();
+        let delta = frame.time.dt.as_secs_f32();
 
-        self.views.iter_mut().for_each(|v| {
-            v.view.translation = v.view.translation.rotate_y(0.05 * delta);
+        if frame.input.key_just_pressed(&KeyCode::KeyC)
+        {
+            self.use_camera = !self.use_camera;
+        }
 
-            v.view.matrix3 =
+        if self.use_camera
+        {
+            let (d_yaw, d_pitch) = frame.input.mouse_delta();
+            self.camera
+                .rotate_local((0.005 * d_pitch) as _, (0.005 * d_yaw) as _, 0.0);
+
+            self.camera.translate_local(
+                delta
+                    * 2.0
+                    * glam::vec3(
+                        frame.input.axis(&KeyCode::KeyA, &KeyCode::KeyD) as f32,
+                        frame.input.axis(&KeyCode::Space, &KeyCode::ShiftLeft) as f32,
+                        frame.input.axis(&KeyCode::KeyW, &KeyCode::KeyS) as f32,
+                    ),
+            );
+        }
+        else
+        {
+            let delta = 0.05 * f32::consts::TAU * delta;
+            self.rotate_view.view.translation =
+                self.rotate_view.view.translation.rotate_y(0.05 * delta);
+
+            self.rotate_view.view.matrix3 =
                 glam::Mat3::from_euler(glam::EulerRot::default(), -0.025 * delta, 0.0, 0.0)
-                    * v.view.matrix3;
-        });
+                    * self.rotate_view.view.matrix3;
+        }
     }
 
 
@@ -129,7 +162,14 @@ impl ScigEnv for PointEnv
             .collect();
 
         FrameData {
-            views: self.views.to_vec(),
+            views: vec![if self.use_camera
+            {
+                self.camera.view()
+            }
+            else
+            {
+                self.rotate_view
+            }],
             passes,
         }
     }

@@ -1,5 +1,10 @@
 use crate::app::env_thread::EnvRunner;
+use crate::app::input::{
+    InputEvent,
+    InputState,
+};
 use crate::app::state::{
+    FrameState,
     RenderInfo,
     RenderInfoView,
     State,
@@ -52,6 +57,7 @@ pub struct ScigApp
     last_time: Instant,
     start_time: Instant,
     frame: u64,
+    input: InputState,
     window: Option<Arc<window::Window>>,
 }
 
@@ -66,6 +72,7 @@ impl ScigApp
             last_time: Instant::now(),
             start_time: Instant::now(),
             frame: 0,
+            input: InputState::new(),
             window: None,
         }
     }
@@ -132,19 +139,13 @@ impl ApplicationHandler<State> for ScigApp
         &mut self,
         _event_loop: &ActiveEventLoop,
         _device_id: DeviceId,
-        _event: DeviceEvent,
+        event: DeviceEvent,
     )
     {
-        // let Some(state) = &mut self.state
-        // else
-        // {
-        //     return;
-        // };
-
-        // if let Ok(event) = InputEvent::try_from(event)
-        // {
-        //     state.handle_input(event_loop, event);
-        // }
+        if let Ok(input_event) = InputEvent::try_from(event)
+        {
+            self.input.apply(input_event);
+        }
     }
 
 
@@ -196,7 +197,10 @@ impl ApplicationHandler<State> for ScigApp
                 self.last_time = now;
 
                 match state.render(
-                    frame_time,
+                    FrameState {
+                        time: frame_time,
+                        input: self.input.clone(),
+                    },
                     Some(|| {
                         if let Some(window) = self.window.clone()
                         {
@@ -205,7 +209,10 @@ impl ApplicationHandler<State> for ScigApp
                     }),
                 )
                 {
-                    Ok(_) => (),
+                    Ok(_) =>
+                    {
+                        self.input.end_frame();
+                    }
 
                     // Reconfigure the surface if it's lost or outdated
                     // Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) =>
@@ -220,13 +227,12 @@ impl ApplicationHandler<State> for ScigApp
                 }
             }
 
-            _event =>
+            event =>
             {
-                // println!("{:?}", event);
-                // if let Ok(event) = InputEvent::try_from(event)
-                // {
-                //     state.handle_input(event_loop, event);
-                // }
+                if let Ok(input_event) = InputEvent::try_from(event)
+                {
+                    self.input.apply(input_event);
+                }
             }
         }
     }

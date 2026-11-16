@@ -54,7 +54,7 @@ impl RenderInfo
 
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FrameState
 {
     pub time: FrameTime,
@@ -104,11 +104,11 @@ impl State
 
     pub fn render(
         &mut self,
-        frame_time: FrameTime,
+        frame_state: FrameState,
         pre_present: Option<impl FnOnce()>,
     ) -> anyhow::Result<()>
     {
-        let frame_data = self.env.get_frame(FrameState::from_time(frame_time))?;
+        let frame_data = self.env.get_frame(frame_state.clone())?;
 
         let frame = self.render_info.target.acquire(&self.render_info.context)?;
         let mut encoder = self
@@ -131,7 +131,7 @@ impl State
                 .iter()
                 .map(|p| p.as_ref() as &dyn Pass)
                 .collect::<Vec<_>>(),
-            frame_time,
+            frame_state.time,
         );
 
         self.render_info.context.queue.submit([encoder.finish()]);

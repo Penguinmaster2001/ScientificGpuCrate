@@ -140,7 +140,7 @@ impl TryFrom<DeviceEvent> for InputEvent
 
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct MouseState
 {
     pub pixel_scroll_delta: (f64, f64),
@@ -196,7 +196,7 @@ impl MouseState
 
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 struct KeyState
 {
     pressed: bool,
@@ -205,7 +205,7 @@ struct KeyState
 
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct InputState
 {
     mouse: MouseState,
