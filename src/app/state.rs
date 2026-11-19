@@ -7,6 +7,10 @@ use crate::core::pass::{
     encode_frame,
 };
 use crate::core::pipeline::PipelineCache;
+use crate::core::readback::{
+    EncoderToken,
+    TextureReadBack,
+};
 use crate::core::shader::ShaderLib;
 use crate::core::target::Target;
 use crate::core::view::ViewBuffer;
@@ -144,5 +148,52 @@ impl State
         frame.present(&self.render_info.context);
 
         Ok(())
+    }
+
+
+
+    pub fn render_to_texture(
+        &mut self,
+        size: impl Into<(u32, u32)>,
+        format: wgpu::TextureFormat,
+    ) -> anyhow::Result<Vec<u8>>
+    {
+        let frame_data = self.env.get_frame_immediate()?;
+
+        let mut target = Target::offscreen(&self.render_info.context, size, format);
+        let frame = target.acquire(&self.render_info.context).unwrap();
+        let mut encoder = self
+            .render_info
+            .context
+            .device
+            .create_command_encoder(&Default::default());
+
+        encode_frame(
+            &self.render_info.context,
+            &mut self.render_info.shaders,
+            &mut self.render_info.pipelines,
+            &mut self.render_info.view_buffer,
+            &mut encoder,
+            &frame,
+            &frame_data.views,
+            self.render_info.clear,
+            &frame_data
+                .passes
+                .iter()
+                .map(|p| p.as_ref() as &dyn Pass)
+                .collect::<Vec<_>>(),
+            FrameTime::default(),
+        );
+
+        let rb = TextureReadBack::encode_texture(
+            &self.render_info.context,
+            &mut encoder,
+            target
+                .color()
+                .expect("Offscreen target should have color texture"),
+        );
+        self.render_info.context.queue.submit([encoder.finish()]);
+        frame.present(&self.render_info.context);
+        rb.map_texture(&self.render_info.context, EncoderToken { id: 0 })
     }
 }

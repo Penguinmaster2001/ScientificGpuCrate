@@ -304,6 +304,32 @@ impl InputState
 
 
 
+    pub fn key_combo_down<'a>(&self, keys: impl IntoIterator<Item = &'a KeyCode>) -> bool
+    {
+        keys.into_iter().all(|key| self.key_down(key))
+    }
+
+
+
+    pub fn key_combo_just_pressed<'a>(&self, keys: impl IntoIterator<Item = &'a KeyCode>) -> bool
+    {
+        let mut one_just_pressed = true;
+
+        for key in keys.into_iter()
+        {
+            if !self.key_down(key)
+            {
+                return false;
+            }
+
+            one_just_pressed = !one_just_pressed && self.key_just_pressed(key);
+        }
+
+        one_just_pressed
+    }
+
+
+
     pub fn key_just_pressed(&self, key: &KeyCode) -> bool
     {
         matches!(

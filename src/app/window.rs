@@ -18,6 +18,7 @@ use crate::core::pass::FrameTime;
 use crate::core::pipeline::PipelineCache;
 use crate::core::shader::ShaderLib;
 use crate::core::target::Target;
+use crate::core::texture::texture_data_to_image;
 use crate::core::view::ViewBuffer;
 use pollster::FutureExt;
 use std::{
@@ -25,6 +26,7 @@ use std::{
     time::Instant,
 };
 use winit::event::WindowEvent;
+use winit::keyboard::KeyCode;
 use winit::window::Window;
 use winit::{
     application::ApplicationHandler,
@@ -211,6 +213,19 @@ impl ApplicationHandler<State> for ScigApp
                 {
                     Ok(_) =>
                     {
+                        if self
+                            .input
+                            .key_combo_just_pressed([&KeyCode::AltLeft, &KeyCode::KeyP])
+                        {
+                            let size = (3840, 2160);
+                            let data = state
+                                .render_to_texture(size, wgpu::TextureFormat::Rgba8Unorm)
+                                .unwrap();
+                            texture_data_to_image(&data, size)
+                                .save("image.png")
+                                .unwrap();
+                        }
+
                         self.input.end_frame();
                     }
 

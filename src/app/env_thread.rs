@@ -92,6 +92,18 @@ impl EnvRunner
 
 
 
+    pub fn get_frame_immediate(&mut self) -> anyhow::Result<Ref<'_, FrameData>>
+    {
+        if self.handle.finished()
+        {
+            anyhow::bail!("thread done")
+        }
+
+        Ok(self.handle.snapshot.borrow_and_update())
+    }
+
+
+
     pub fn get_frame(&mut self, frame: FrameState) -> anyhow::Result<Ref<'_, FrameData>>
     {
         if self.handle.finished()
