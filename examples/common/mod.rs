@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+
+
+
 use scig::{
     app::window::{
         EnvFactory,
